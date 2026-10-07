@@ -2,7 +2,7 @@
 
 This repository is the working area for an AI-assisted investigation and implementation of Density Aware Evidential Deep Learning (DAEDL), published at ICML 2024. The project focuses on CIFAR-10 classification, probability calibration, uncertainty on errors and corrupted inputs, and a manageable out-of-distribution test.
 
-Current status: Phase 2 implementation and two-epoch pilot validation complete. No final training results have been produced, and no paper or pilot values are presented as final results.
+Current status: Phase 3A seed-3024 full-data Softmax and DAEDL core experiments are complete and validated. See [PHASE3A_RESULTS.md](PHASE3A_RESULTS.md). Seeds 3025/3026, corruptions, EDL, CIFAR-100 OOD, final report generation, and publication have not been started.
 
 ## Reproducibility policy
 
