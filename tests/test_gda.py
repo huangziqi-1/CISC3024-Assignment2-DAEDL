@@ -25,3 +25,13 @@ def test_gda_shapes_cpu_float64_and_density_range():
 def test_gda_rejects_too_few_samples_for_full_covariance():
     with pytest.raises(ValueError, match="need more than embedding dimension"):
         fit_gda(torch.randn(6, 4), torch.tensor([0, 0, 0, 1, 1, 1]), num_classes=2)
+
+
+def test_gda_regularizes_rank_deficient_embeddings():
+    generator = torch.Generator().manual_seed(7)
+    active = torch.randn(40, 2, generator=generator)
+    embeddings = torch.cat([active, torch.zeros(40, 3)], dim=1)
+    labels = torch.cat([torch.zeros(20, dtype=torch.long), torch.ones(20, dtype=torch.long)])
+    state = fit_gda(embeddings, labels, num_classes=2)
+    assert all(jitter >= 1e-8 for jitter in state.jitter_by_class)
+    assert torch.all(torch.diagonal(state.cholesky, dim1=-2, dim2=-1) > 0)

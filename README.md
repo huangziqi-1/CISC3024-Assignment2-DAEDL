@@ -2,7 +2,7 @@
 
 This repository is the working area for an AI-assisted investigation and implementation of Density Aware Evidential Deep Learning (DAEDL), published at ICML 2024. The project focuses on CIFAR-10 classification, probability calibration, uncertainty on errors and corrupted inputs, and a manageable out-of-distribution test.
 
-Current status: investigation and experiment planning only. No final training results have been produced, and no paper values are presented as our own.
+Current status: Phase 2 implementation and two-epoch pilot validation complete. No final training results have been produced, and no paper or pilot values are presented as final results.
 
 ## Reproducibility policy
 
@@ -20,5 +20,13 @@ See [PLANNING_REVIEW.md](PLANNING_REVIEW.md), [AI_USAGE_LOG.md](AI_USAGE_LOG.md)
 2. Phase B: one-seed pilot comparing Softmax, EDL, and DAEDL.
 3. Phase C: final multi-seed runs only after inspecting pilot runtime and trends.
 
-The exact environment will be frozen after Phase A succeeds on this Mac. `environment.yml` and `requirements.txt` currently specify the intended package family without pretending that an untested lock file is validated.
+## Environment setup
 
+```bash
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install --no-build-isolation -e .
+MPLCONFIGDIR=.cache/matplotlib .venv/bin/python -m pytest
+```
+
+The validated host environment uses Python 3.11.5, PyTorch 2.14.1, torchvision 0.29.1, and Apple MPS for training. DAEDL post-training inference and density fitting currently use CPU because the spectral-normalized model produced NaN embeddings on the PyTorch 2.14.1 MPS evaluation path. See [PILOT_SUMMARY.md](PILOT_SUMMARY.md).

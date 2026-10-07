@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import subprocess
+import time
 from pathlib import Path
 
 import numpy as np
@@ -77,6 +78,7 @@ def main() -> None:
             "spectral_normalization": args.model == "daedl",
             "density_device": "cpu",
             "density_dtype": "float64",
+            "post_training_inference_device": "cpu" if args.model == "daedl" else choice.effective,
         }
     )
     run_dir = create_run_directory(args.output_root, args.model, args.seed)
@@ -112,6 +114,7 @@ def main() -> None:
         "spectral_normalization": args.model == "daedl",
     }
     model = CifarResNet18(**model_kwargs)
+    pilot_started = time.perf_counter()
     training = train_model(
         model=model,
         model_type=args.model,
@@ -148,11 +151,23 @@ def main() -> None:
 
     gda_state = None
     density_summary = None
+    density_runtime_seconds = 0.0
+    evaluation_device = device
     if args.model == "daedl":
-        gda_state = fit_daedl_density(model, loaders.density, device)
+        # PyTorch 2.14.1 MPS produced NaN embeddings from this spectral-normalized
+        # checkpoint in eval mode, while the same weights were finite on CPU.
+        # Training stays on MPS; post-training feature extraction, GDA, and pilot
+        # prediction therefore move explicitly to CPU.
+        evaluation_device = torch.device("cpu")
+        model.to(evaluation_device)
+        density_started = time.perf_counter()
+        gda_state = fit_daedl_density(model, loaders.density, evaluation_device)
+        density_runtime_seconds = time.perf_counter() - density_started
         density_summary = {
             "device": gda_state.means.device.type,
             "dtype": str(gda_state.means.dtype),
+            "feature_extraction_device": evaluation_device.type,
+            "reason_for_cpu_feature_extraction": "PyTorch 2.14.1 MPS spectral-normalized eval produced NaN embeddings",
             "embedding_dim": int(gda_state.means.shape[1]),
             "log_density_min": gda_state.log_density_min,
             "log_density_max": gda_state.log_density_max,
@@ -171,7 +186,10 @@ def main() -> None:
         )
         write_json(run_dir / "density_summary.json", density_summary)
 
-    metrics, rows = evaluate_model(model, loaders.test, device, args.model, gda_state)
+    evaluation_started = time.perf_counter()
+    metrics, rows = evaluate_model(model, loaders.test, evaluation_device, args.model, gda_state)
+    evaluation_runtime_seconds = time.perf_counter() - evaluation_started
+    total_runtime_seconds = time.perf_counter() - pilot_started
     metrics.update(
         {
             "phase": "PILOT_ONLY_NOT_FINAL",
@@ -180,7 +198,12 @@ def main() -> None:
             "validation_size": len(loaders.validation.dataset),
             "test_size": len(loaders.test.dataset),
             "epochs": args.epochs,
-            "runtime_seconds": training.runtime_seconds,
+            "training_runtime_seconds": training.runtime_seconds,
+            "density_runtime_seconds": density_runtime_seconds,
+            "evaluation_runtime_seconds": evaluation_runtime_seconds,
+            "total_pipeline_runtime_seconds": total_runtime_seconds,
+            "training_device": device.type,
+            "evaluation_device": evaluation_device.type,
             "checkpoint_round_trip_verified": checkpoint_verified,
             "final_epoch": training.history[-1],
             "density": density_summary,
@@ -206,7 +229,8 @@ def main() -> None:
     (run_dir / "logs.txt").write_text(
         "PILOT ONLY - not for final report results.\n"
         f"device_requested={choice.requested}\n"
-        f"device_effective={choice.effective}\n"
+        f"training_device_effective={choice.effective}\n"
+        f"evaluation_device_effective={evaluation_device.type}\n"
         f"checkpoint_round_trip_verified={checkpoint_verified}\n"
     )
     print(json.dumps({"run_dir": str(run_dir), "metrics": metrics}, indent=2, default=str))

@@ -27,15 +27,25 @@ class GDAState:
 
 
 def _regularized_cholesky(covariance: torch.Tensor) -> tuple[torch.Tensor, float]:
+    covariance = 0.5 * (covariance + covariance.T)
+    if not torch.isfinite(covariance).all():
+        raise FloatingPointError("GDA covariance contains NaN or infinity")
     dimension = covariance.shape[0]
     scale = max(float(torch.trace(covariance) / dimension), 1e-12)
     eye = torch.eye(dimension, dtype=torch.float64)
-    for multiplier in (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1):
-        jitter = scale * multiplier
+    # The short pilot produces rank-deficient covariances because several ReLU
+    # embedding coordinates are constant. Use scale-relative diagonal loading,
+    # with an absolute floor for near-zero covariance matrices.
+    for multiplier in (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0):
+        jitter = max(scale * multiplier, 1e-8)
         factor, info = torch.linalg.cholesky_ex(covariance + jitter * eye)
         if int(info) == 0 and torch.isfinite(factor).all():
             return factor, jitter
-    raise RuntimeError("GDA covariance remained non-positive-definite after adaptive jitter")
+    minimum_eigenvalue = float(torch.linalg.eigvalsh(covariance).min())
+    raise RuntimeError(
+        "GDA covariance remained non-positive-definite after adaptive jitter; "
+        f"scale={scale:.6g}, min_eigenvalue={minimum_eigenvalue:.6g}"
+    )
 
 
 def class_log_probabilities(embeddings: torch.Tensor, state: GDAState) -> torch.Tensor:
@@ -104,4 +114,3 @@ def fit_gda(embeddings: torch.Tensor, labels: torch.Tensor, num_classes: int = 1
     provisional.log_density_max = float(training_density.max())
     provisional.validate()
     return provisional
-

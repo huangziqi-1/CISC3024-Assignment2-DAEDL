@@ -28,8 +28,11 @@ def main() -> None:
     checkpoint = torch.load(args.run_dir / "checkpoint.pt", map_location="cpu", weights_only=True)
     model = CifarResNet18(**checkpoint["model_kwargs"])
     model.load_state_dict(checkpoint["model_state"])
-    model.to(device)
     model_type = checkpoint["model_type"]
+    if model_type == "daedl" and device.type == "mps":
+        print("DAEDL OOD evaluation explicitly uses CPU because MPS spectral-normalized eval produced NaN embeddings")
+        device = torch.device("cpu")
+    model.to(device)
 
     gda_state = None
     if model_type == "daedl":
