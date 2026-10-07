@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Environments and local configuration
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Datasets and downloaded artifacts
+data/*
+!data/README.md
+
+# Model checkpoints (keep directory documentation only)
+checkpoints/*
+!checkpoints/.gitkeep
+*.pt
+*.pth
+*.ckpt
+
+# Generated experiment outputs
+results/*
+!results/.gitkeep
+figures/*
+!figures/.gitkeep
+logs/
+runs/
+
+# Notebook and editor files
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Reports generated from source
+report/*.pdf
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
