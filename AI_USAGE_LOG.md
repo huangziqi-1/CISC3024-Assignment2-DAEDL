@@ -93,3 +93,20 @@ This log records the assignment work performed by Codex. The student did not man
 - During report generation, the validator initially treated the replication-only `skip_individual_figures` flag as scientific configuration and stopped. It was explicitly reclassified as artifact-output metadata. A second attempt exposed an integer Markdown-column label; formatting was corrected and the validator then passed. Neither issue affected training or metrics.
 
 **Decision:** The frozen replication is valid and complete. The clean/calibration findings are stable, but SVHN OOD rankings are not. Stop after Phase 3B and recommend a small, pre-specified corruption experiment as the next phase; do not start it without approval.
+
+## 2026-10-08 - Final repository and report preparation
+
+**Student request:** Convert the verified project into a concise public reproducibility package and a polished 8–12 page coursework report. Do not run new experiments. Publish the source if authenticated GitHub access is available; otherwise stop before the final PDF and identify the single manual dependency.
+
+**Codex work:**
+
+- Audited tracked and ignored files. Raw CIFAR-10/SVHN data, virtual environments, caches, checkpoints, full run directories, and temporary outputs remain excluded. No secret or credential file was added.
+- Confirmed that this checkout has no Git remote and that GitHub CLI is unavailable. No public source-code URL was fabricated.
+- Created a tracked public evidence package containing the frozen configuration, per-seed and aggregate metrics, paired differences, density diagnostics, consistency checks, figure inputs, and four selected report figures. The full local source-of-truth run directories were preserved but remain ignored.
+- Rewrote the README as a professional project page with method summary, headline results, reproduction commands, repository map, paper citation, and transparent disclosure of Codex's role.
+- Rechecked the bibliography against primary publication and dataset pages. The report uses the DAEDL paper, foundational EDL and calibration papers, CIFAR-10 and SVHN sources, PyTorch MPS documentation, and the authors' official repository.
+- Generated an original DAEDL conceptual diagram and regenerated the seed-3024 reliability diagram from saved bin data with sparse-bin suppression stated explicitly. No experiment or metric changed.
+- Generated the report directly from tracked machine-readable results. The Word document contains 4 figures, 3 tables, 5 rendered equations, and 7 references. It was rendered to 12 page images and visually inspected; layout corrections removed a Word title border, improved reference pagination, and increased footer clearance.
+- Programmatically verified the required headline numbers in both Word and Markdown, checked that no placeholder/TODO text exists, and confirmed that the Phase-3B consistency file still reports PASS.
+
+**Decision:** Phase 4A and the report draft are complete. The only remaining action is publication of this repository to a public GitHub URL. The source-code section and final PDF are intentionally withheld until a real URL is available.

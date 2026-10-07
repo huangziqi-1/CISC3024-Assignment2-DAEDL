@@ -28,8 +28,12 @@ checkpoints/*
 # Generated experiment outputs
 results/*
 !results/.gitkeep
+!results/final_summary/
+!results/final_summary/**
 figures/*
 !figures/.gitkeep
+!figures/final/
+!figures/final/**
 logs/
 runs/
 
@@ -42,7 +46,9 @@ Thumbs.db
 
 # Reports generated from source
 report/*.pdf
+!report/CISC3024_AI_Assignment2_Final.pdf
 report/*.aux
 report/*.log
 report/*.out
 report/*.toc
+report/equations/

@@ -1,0 +1,73 @@
+{
+  "aggregate_sd_definition": "sample standard deviation across seeds (ddof=1)",
+  "frozen_scientific_configuration_across_all_six_runs": true,
+  "identical_split_indices_within_each_seed": true,
+  "identical_svhn_indices_within_each_seed": true,
+  "phase3a_seed3024_artifacts_reused_without_rerun": true,
+  "runs": {
+    "daedl_seed3024": {
+      "all_numeric_outputs_finite": true,
+      "checkpoint_round_trip_verified_during_run": true,
+      "directory": "results/final_core_daedl_seed3024_phase3a",
+      "metrics_recomputed_match": true,
+      "phase": "FINAL_CORE",
+      "probabilities_normalized": true,
+      "selected_checkpoint_is_minimum_validation_nll": true,
+      "selected_epoch": 27
+    },
+    "daedl_seed3025": {
+      "all_numeric_outputs_finite": true,
+      "checkpoint_round_trip_verified_during_run": true,
+      "directory": "results/final_replication_daedl_seed3025",
+      "metrics_recomputed_match": true,
+      "phase": "FINAL_REPLICATION",
+      "probabilities_normalized": true,
+      "selected_checkpoint_is_minimum_validation_nll": true,
+      "selected_epoch": 30
+    },
+    "daedl_seed3026": {
+      "all_numeric_outputs_finite": true,
+      "checkpoint_round_trip_verified_during_run": true,
+      "directory": "results/final_replication_daedl_seed3026",
+      "metrics_recomputed_match": true,
+      "phase": "FINAL_REPLICATION",
+      "probabilities_normalized": true,
+      "selected_checkpoint_is_minimum_validation_nll": true,
+      "selected_epoch": 30
+    },
+    "softmax_seed3024": {
+      "all_numeric_outputs_finite": true,
+      "checkpoint_round_trip_verified_during_run": true,
+      "directory": "results/final_core_softmax_seed3024_phase3a",
+      "metrics_recomputed_match": true,
+      "phase": "FINAL_CORE",
+      "probabilities_normalized": true,
+      "selected_checkpoint_is_minimum_validation_nll": true,
+      "selected_epoch": 26
+    },
+    "softmax_seed3025": {
+      "all_numeric_outputs_finite": true,
+      "checkpoint_round_trip_verified_during_run": true,
+      "directory": "results/final_replication_softmax_seed3025",
+      "metrics_recomputed_match": true,
+      "phase": "FINAL_REPLICATION",
+      "probabilities_normalized": true,
+      "selected_checkpoint_is_minimum_validation_nll": true,
+      "selected_epoch": 27
+    },
+    "softmax_seed3026": {
+      "all_numeric_outputs_finite": true,
+      "checkpoint_round_trip_verified_during_run": true,
+      "directory": "results/final_replication_softmax_seed3026",
+      "metrics_recomputed_match": true,
+      "phase": "FINAL_REPLICATION",
+      "probabilities_normalized": true,
+      "selected_checkpoint_is_minimum_validation_nll": true,
+      "selected_epoch": 29
+    }
+  },
+  "split_varies_across_seeds": true,
+  "status": "PASS",
+  "test_indices_identical_across_all_runs": true,
+  "training_seed_is_replication_unit": true
+}

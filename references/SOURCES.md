@@ -29,3 +29,16 @@ Accessed 2026-10-07 unless otherwise stated.
 - PyTorch macOS installation: https://docs.pytorch.org/get-started/locally/
 
 The PyTorch MPS documentation states that MPS provides GPU acceleration on macOS and does not support float64 tensors. That constraint motivates CPU-side GDA density fitting.
+
+## Final report bibliography audit
+
+Metadata below was checked against the linked primary publication or dataset page on 2026-10-08.
+
+1. Yoon, T., and Kim, H. (2024). “Uncertainty Estimation by Density Aware Evidential Deep Learning.” *Proceedings of the 41st International Conference on Machine Learning*, Proceedings of Machine Learning Research, 235, 57217–57243. https://proceedings.mlr.press/v235/yoon24a.html
+2. Sensoy, M., Kaplan, L., and Kandemir, M. (2018). “Evidential Deep Learning to Quantify Classification Uncertainty.” *Advances in Neural Information Processing Systems 31*. https://papers.nips.cc/paper/2018/hash/a981f2b708044d6fb4a71a1463242520-Abstract.html
+3. Guo, C., Pleiss, G., Sun, Y., and Weinberger, K. Q. (2017). “On Calibration of Modern Neural Networks.” *Proceedings of the 34th International Conference on Machine Learning*, Proceedings of Machine Learning Research, 70, 1321–1330. https://proceedings.mlr.press/v70/guo17a.html
+4. Krizhevsky, A. (2009). *Learning Multiple Layers of Features from Tiny Images*. Technical report, University of Toronto. https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf
+5. Netzer, Y., Wang, T., Coates, A., Bissacco, A., Wu, B., and Ng, A. Y. (2011). “Reading Digits in Natural Images with Unsupervised Feature Learning.” *NIPS Workshop on Deep Learning and Unsupervised Feature Learning*. https://ufldl.stanford.edu/housenumbers/nips2011_housenumbers.pdf
+6. PyTorch Contributors. “MPS backend.” *PyTorch documentation*. https://docs.pytorch.org/docs/main/notes/mps.html
+
+The authors' official DAEDL repository is cited as software in the implementation section: https://github.com/TaeseongYoon/DAEDL. No unrelated uncertainty papers were added merely to expand the bibliography.

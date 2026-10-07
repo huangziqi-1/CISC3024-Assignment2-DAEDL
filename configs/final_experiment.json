@@ -1,0 +1,66 @@
+{
+  "aggregate_variability": "sample standard deviation (ddof=1)",
+  "architecture": "compact_cifar_resnet18",
+  "base_width": 32,
+  "batch_size": 64,
+  "checkpoint_selection": "minimum validation NLL; test set never consulted",
+  "daedl_loss_reduction": "mean of complete per-example objective; data and KL terms scaled together",
+  "data_dir": "data",
+  "density_device": "cpu",
+  "density_dtype": "float64",
+  "device": "mps",
+  "embedding_dim": 128,
+  "epochs": 30,
+  "experiment_name": "frozen_three_seed_softmax_daedl_comparison",
+  "gradient_clip_max_norm": 10.0,
+  "learning_rate": 0.001,
+  "minimum_learning_rate": 1e-05,
+  "model_kwargs": {
+    "base_width": 32,
+    "embedding_dim": 128,
+    "num_classes": 10,
+    "spectral_normalization": true
+  },
+  "models": [
+    "softmax",
+    "daedl"
+  ],
+  "normalization_mean": [
+    0.4914,
+    0.4822,
+    0.4465
+  ],
+  "normalization_std": [
+    0.2023,
+    0.1994,
+    0.201
+  ],
+  "num_workers": 0,
+  "ood_dataset": "SVHN test split",
+  "output_root": "results",
+  "post_training_cpu_reason": "PyTorch 2.14.1 MPS produced non-finite outputs for a reloaded spectral-normalized pilot checkpoint; both final models use the same explicit CPU evaluation policy",
+  "post_training_evaluation_device": "cpu",
+  "primary_common_uncertainty_score": "normalized predictive entropy",
+  "regularization": 0.05,
+  "replicate_unit": "training seed / model run",
+  "seeds": [
+    3024,
+    3025,
+    3026
+  ],
+  "spectral_normalization": {
+    "enabled": true,
+    "identical_for_softmax_and_daedl": true,
+    "layers": "all convolutional layers, shortcut projections, embedding linear layer, classifier linear layer"
+  },
+  "svhn_evaluation_size": 10000,
+  "test_size": 10000,
+  "train_size": 45000,
+  "training_augmentation": [
+    "random_crop_32_padding_4",
+    "random_horizontal_flip"
+  ],
+  "training_probability_for_validation_nll": "softmax(logits), exactly exp(logits)/sum(exp(logits)) for DAEDL before density scaling",
+  "validation_size": 5000,
+  "weight_decay": 0.0005
+}
