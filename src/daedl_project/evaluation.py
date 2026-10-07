@@ -39,6 +39,49 @@ def fit_daedl_density(model: nn.Module, loader: DataLoader, device: torch.device
     return fit_gda(embeddings, labels, num_classes=10)
 
 
+def embedding_density_diagnostics(
+    embeddings: torch.Tensor, labels: torch.Tensor, near_constant_relative: float = 1e-6
+) -> dict:
+    """Describe feature degeneracy and per-class empirical covariance stability."""
+    x = embeddings.detach().to(device="cpu", dtype=torch.float64)
+    y = labels.detach().to(device="cpu", dtype=torch.int64)
+    standard_deviation = x.std(dim=0, unbiased=True)
+    scale = max(float(standard_deviation.max()), 1e-12)
+    constant = standard_deviation <= 1e-12
+    near_constant = standard_deviation <= scale * near_constant_relative
+    classes = []
+    for class_index in range(10):
+        class_x = x[y == class_index]
+        centered = class_x - class_x.mean(dim=0)
+        covariance = centered.T @ centered / (class_x.shape[0] - 1)
+        eigenvalues = torch.linalg.eigvalsh(0.5 * (covariance + covariance.T))
+        positive = eigenvalues[eigenvalues > max(float(eigenvalues.max()) * 1e-12, 1e-15)]
+        condition = float(eigenvalues.max() / positive.min()) if positive.numel() else float("inf")
+        classes.append(
+            {
+                "class": class_index,
+                "samples": int(class_x.shape[0]),
+                "centered_embedding_rank": int(torch.linalg.matrix_rank(centered)),
+                "covariance_rank": int(torch.linalg.matrix_rank(covariance)),
+                "minimum_eigenvalue": float(eigenvalues.min()),
+                "maximum_eigenvalue": float(eigenvalues.max()),
+                "positive_spectrum_condition_number": condition,
+            }
+        )
+    return {
+        "samples": int(x.shape[0]),
+        "embedding_dim": int(x.shape[1]),
+        "nonfinite_fraction": float((~torch.isfinite(x)).sum() / x.numel()),
+        "constant_dimensions_threshold": 1e-12,
+        "constant_dimensions": int(constant.sum()),
+        "near_constant_relative_threshold": near_constant_relative,
+        "near_constant_absolute_threshold": scale * near_constant_relative,
+        "near_constant_dimensions": int(near_constant.sum()),
+        "global_embedding_rank": int(torch.linalg.matrix_rank(x - x.mean(dim=0))),
+        "classes": classes,
+    }
+
+
 def _row_base(index: int, label: int, probabilities: np.ndarray, logits: np.ndarray) -> dict:
     prediction = int(probabilities.argmax())
     row = {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -17,6 +18,9 @@ from .metrics import classification_metrics
 class TrainingResult:
     history: list[dict]
     best_state: dict[str, torch.Tensor]
+    final_state: dict[str, torch.Tensor]
+    best_epoch: int
+    best_validation_nll: float
     runtime_seconds: float
 
 
@@ -68,10 +72,15 @@ def train_model(
     learning_rate: float,
     weight_decay: float,
     regularization: float,
+    minimum_learning_rate: float = 0.0,
+    progress_log_path: str | Path | None = None,
 ) -> TrainingResult:
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(epochs, 1))
-    best_loss = float("inf")
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=max(epochs, 1), eta_min=minimum_learning_rate
+    )
+    best_nll = float("inf")
+    best_epoch = 0
     best_state = None
     history: list[dict] = []
     model.to(device)
@@ -113,19 +122,27 @@ def train_model(
             "validation_loss": validation["loss"],
             "validation_accuracy": validation["accuracy"],
             "validation_macro_f1": validation["macro_f1"],
+            "validation_nll": validation["nll"],
+            "validation_ece_15": validation["ece_15"],
             "learning_rate": optimizer.param_groups[0]["lr"],
             "epoch_seconds": time.perf_counter() - epoch_start,
         }
         row.update({f"train_{key}": value / count for key, value in component_totals.items()})
         history.append(row)
-        if validation["loss"] < best_loss:
-            best_loss = validation["loss"]
+        if progress_log_path is not None:
+            import json
+
+            with Path(progress_log_path).open("a") as handle:
+                handle.write(json.dumps(row, sort_keys=True) + "\n")
+        if validation["nll"] < best_nll:
+            best_nll = validation["nll"]
+            best_epoch = epoch
             best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
 
     _synchronize(device)
     if best_state is None:
         raise RuntimeError("training produced no checkpoint")
-    model.load_state_dict(best_state)
-    model.to(device)
-    return TrainingResult(history, best_state, time.perf_counter() - started)
-
+    final_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+    return TrainingResult(
+        history, best_state, final_state, best_epoch, best_nll, time.perf_counter() - started
+    )

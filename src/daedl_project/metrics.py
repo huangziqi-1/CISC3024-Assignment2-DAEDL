@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
-from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
+from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score, roc_auc_score
 
 
 EPS = 1e-12
@@ -91,6 +91,8 @@ def classification_metrics(probabilities: np.ndarray, labels: np.ndarray, n_bins
     predictions = probabilities.argmax(axis=1)
     return {
         "accuracy": float((predictions == labels).mean()),
+        "macro_precision": float(precision_score(labels, predictions, average="macro", zero_division=0)),
+        "macro_recall": float(recall_score(labels, predictions, average="macro", zero_division=0)),
         "macro_f1": float(f1_score(labels, predictions, average="macro", zero_division=0)),
         "nll": negative_log_likelihood(probabilities, labels),
         "ece_15": expected_calibration_error(probabilities, labels, n_bins=n_bins),
@@ -125,4 +127,3 @@ def error_detection_metrics(correct: np.ndarray, uncertainty: np.ndarray) -> dic
         result[f"{name}_mean_uncertainty"] = float(values.mean()) if values.size else float("nan")
         result[f"{name}_median_uncertainty"] = float(np.median(values)) if values.size else float("nan")
     return result
-

@@ -35,6 +35,28 @@ def test_daedl_loss_and_gradients_are_finite():
     assert all(np.isfinite(value) for value in components.values())
 
 
+def test_mean_reduction_scales_complete_daedl_objective_consistently():
+    logits = torch.tensor([[0.2, -0.4, 0.7], [-0.1, 0.6, 0.3]], dtype=torch.float64)
+    labels = torch.tensor([2, 1])
+    regularization = 0.05
+    mean_loss, _ = daedl_loss(logits, labels, num_classes=3, regularization=regularization)
+    alpha = torch.exp(logits)
+    strength = alpha.sum(dim=1, keepdim=True)
+    targets = torch.nn.functional.one_hot(labels, 3).to(torch.float64)
+    error = ((targets - alpha / strength) ** 2).sum()
+    variance = (alpha * (strength - alpha) / (strength.square() * (strength + 1.0))).sum()
+    adjusted = alpha * (1.0 - targets) + targets
+    alpha0 = adjusted.sum(dim=1)
+    kl = (
+        torch.lgamma(alpha0)
+        - torch.lgamma(adjusted).sum(dim=1)
+        - torch.lgamma(torch.tensor(3.0, dtype=torch.float64))
+        + ((adjusted - 1.0) * (torch.digamma(adjusted) - torch.digamma(alpha0).unsqueeze(1))).sum(dim=1)
+    ).sum()
+    official_sum_form = error + variance + regularization * kl
+    assert torch.allclose(mean_loss * labels.numel(), official_sum_form)
+
+
 def test_nonfinite_logits_are_rejected():
     with pytest.raises(FloatingPointError):
         concentration_from_logits(torch.tensor([[float("inf"), 0.0]]))

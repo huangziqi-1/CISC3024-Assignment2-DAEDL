@@ -13,9 +13,11 @@ import torch
 import torchvision
 
 
-def create_run_directory(root: str | Path, model_name: str, seed: int) -> Path:
+def create_run_directory(
+    root: str | Path, model_name: str, seed: int, prefix: str = "pilot"
+) -> Path:
     timestamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%z")
-    run_dir = Path(root) / f"pilot_{model_name}_seed{seed}_{timestamp}_{uuid4().hex[:6]}"
+    run_dir = Path(root) / f"{prefix}_{model_name}_seed{seed}_{timestamp}_{uuid4().hex[:6]}"
     run_dir.mkdir(parents=True, exist_ok=False)
     return run_dir
 
@@ -59,4 +61,3 @@ def environment_record(device_choice: dict) -> dict:
 def save_predictions(path: str | Path, rows: list[dict]) -> None:
     frame = pd.DataFrame(rows).sort_values("sample_index")
     frame.to_csv(path, index=False)
-

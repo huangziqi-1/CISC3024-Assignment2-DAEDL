@@ -24,3 +24,10 @@ def test_cifar_resnet_exposes_logits_and_128d_embedding():
     assert embedding.shape == (2, 128)
     assert torch.isfinite(logits).all()
     assert torch.isfinite(embedding).all()
+
+
+def test_spectral_normalization_covers_all_weighted_backbone_layers():
+    model = CifarResNet18(embedding_dim=128, base_width=8, spectral_normalization=True)
+    weighted = [module for module in model.modules() if isinstance(module, (torch.nn.Conv2d, torch.nn.Linear))]
+    assert weighted
+    assert all(hasattr(module.parametrizations, "weight") for module in weighted)

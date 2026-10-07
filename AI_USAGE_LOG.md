@@ -41,3 +41,15 @@ This log records the assignment work performed by Codex. The student did not man
 
 **Decision:** Phase 2 passed. Pilot values are diagnostic only. Do not start Phase 3 without approval.
 
+## 2026-10-07 - Phase 3A implementation and pre-training audit
+
+**Student request:** Run one trustworthy full-scale seed-3024 comparison of Softmax and DAEDL, including shared spectral normalization, validation-NLL checkpoint selection, complete clean/error/calibration/SVHN evaluation, density diagnostics, and analysis-quality artifacts. Do not start other seeds or corruptions.
+
+**Codex work before training:**
+
+- Audited the Phase-2 architecture. The pilot Softmax model had no spectral normalization while DAEDL did, which would confound the final comparison. Phase 3A enables the identical configuration for both models: spectral normalization on the CIFAR stem, every residual-block convolution, every learned shortcut projection, the 128-D embedding layer, and the classifier. Batch-normalization layers and identity shortcuts have no eligible weight matrix and are unchanged.
+- Compared the local DAEDL loss directly with the authors' official `train.py`. The official implementation sums the expected squared-error component, predictive-variance component, and KL component across the batch, then adds them. The local implementation constructs the same complete per-example objective and averages it across the batch. Therefore every component, including the KL regularizer, is divided by the same batch size; relative weighting is unchanged. The mean is retained as an optimization-scale adaptation, and a regression test verifies `mean_loss * batch_size == official_sum_form` on unclamped finite logits.
+- Changed the common checkpoint criterion from method-specific validation objective to minimum validation NLL. For DAEDL before density fitting, `exp(logits) / sum(exp(logits))` is exactly `softmax(logits)`, so this metric is defined without fitting density on validation data. Both best-validation-NLL and final-epoch checkpoints are saved; the test set is not used for selection.
+- Set 30 epochs, AdamW, batch size 64, initial learning rate `1e-3`, weight decay `5e-4`, cosine decay to `1e-5`, seed/split seed 3024, and full 45,000/5,000/10,000 CIFAR-10 partitions.
+- Retained MPS training and made post-training CPU evaluation explicit for both spectral-normalized models. This shared policy avoids the PyTorch 2.14.1 MPS non-finite-output issue observed after reloading the DAEDL pilot checkpoint. DAEDL clean feature extraction and full-covariance GDA remain CPU float64.
+- Added full-run density diagnostics, deterministic equal-size SVHN evaluation, deterministic representative selection, figure-input files, analysis figures, dual checkpoints, progress logs, and consistency-test hooks. No Phase-3A training result existed at the time of this entry.
