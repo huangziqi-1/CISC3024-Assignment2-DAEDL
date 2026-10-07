@@ -67,3 +67,15 @@ This log records the assignment work performed by Codex. The student did not man
 - The final automated consistency audit passed: identical split/test/SVHN indices, no split overlap, correct best-NLL checkpoint selection, finite outputs, normalized probabilities, metric recomputation agreement, positive DAEDL concentrations, correct OOD/error orientation, and zero non-finite density values. All 16 automated tests passed after implementation.
 
 **Decision:** Retain Phase 3A as the first final core result. The evidence supports running seeds 3025 and 3026 next with the configuration frozen, before adding corruptions. Do not tune away the single-seed result or start Phase 3B without approval.
+
+## 2026-10-07 - Phase 3B frozen replication setup
+
+**Student request:** Replicate the accepted Phase-3A Softmax and DAEDL experiments at seeds 3025 and 3026, aggregate all three seeds, and stop before corruptions or any tuning.
+
+**Codex pre-run actions:**
+
+- Preserved the seed-3024 FINAL_CORE artifacts without rerunning or modifying them.
+- Parameterized the existing final-run driver only to permit `FINAL_REPLICATION` markers for seeds 3025 and 3026. Scientific settings remain frozen: identical spectrally normalized compact CIFAR ResNet-18, 128-D embedding, batch size 64, AdamW, `1e-3` initial learning rate, `5e-4` weight decay, cosine decay to `1e-5`, 30 epochs, validation-NLL checkpoint selection, DAEDL objective, CPU float64 full-covariance GDA, adaptive covariance loading, and clean/error/SVHN metric definitions.
+- Required the training seed and split seed to match. Within each seed, Softmax and DAEDL therefore use identical train/validation/test and deterministic SVHN indices; across seeds, the stratified training/validation split and training randomness vary according to the established reproducibility protocol.
+- Added an option to suppress redundant per-seed plots. Complete configs, environments, splits, progress logs, histories, both checkpoints, predictions, metrics, runtime, and DAEDL density diagnostics remain mandatory. Aggregate figures will be generated only after all four replications complete.
+- No hyperparameter or implementation change was made in response to the seed-3024 outcome.

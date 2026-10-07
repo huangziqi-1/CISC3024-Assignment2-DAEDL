@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one Phase-3A FINAL_CORE model from training through clean and SVHN evaluation."""
+"""Run one frozen final model from training through clean and SVHN evaluation."""
 from __future__ import annotations
 
 import argparse
@@ -37,7 +37,7 @@ from daedl_project.training import train_model
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run one seed-3024 Phase-3A FINAL_CORE experiment")
+    parser = argparse.ArgumentParser(description="Run one frozen final core/replication experiment")
     parser.add_argument("--model", choices=["softmax", "daedl"], required=True)
     parser.add_argument("--device", choices=["mps", "cuda", "cpu"], default="mps")
     parser.add_argument("--epochs", type=int, default=30)
@@ -54,6 +54,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--output-root", type=Path, default=Path("results"))
     parser.add_argument("--run-dir", type=Path)
+    parser.add_argument("--phase", choices=["FINAL_CORE", "FINAL_REPLICATION"], default="FINAL_CORE")
+    parser.add_argument("--skip-individual-figures", action="store_true")
     return parser.parse_args()
 
 
@@ -182,16 +184,21 @@ def plot_representatives(run_dir: Path, data_dir: Path, selected: list[dict]) ->
 
 def main() -> None:
     args = parse_args()
-    if args.seed != 3024 or args.split_seed != 3024 or args.epochs != 30:
-        raise ValueError("Phase 3A is locked to seed/split 3024 and 30 epochs")
+    if args.epochs != 30 or args.seed != args.split_seed:
+        raise ValueError("final runs require 30 epochs and matching training/split seeds")
+    if args.phase == "FINAL_CORE" and args.seed != 3024:
+        raise ValueError("FINAL_CORE is locked to seed 3024")
+    if args.phase == "FINAL_REPLICATION" and args.seed not in (3025, 3026):
+        raise ValueError("FINAL_REPLICATION is locked to seed 3025 or 3026")
     seed_everything(args.seed)
     choice = choose_device(args.device, allow_cpu_fallback=False)
     training_device = torch.device(choice.effective)
     run_dir = args.run_dir or create_run_directory(
-        args.output_root, args.model, args.seed, prefix="final_core"
+        args.output_root, args.model, args.seed,
+        prefix="final_core" if args.phase == "FINAL_CORE" else "final_replication"
     )
     run_dir.mkdir(parents=True, exist_ok=False) if args.run_dir else None
-    (run_dir / "FINAL_CORE").write_text("Phase 3A seed-3024 core experiment\n")
+    (run_dir / args.phase).write_text(f"{args.phase} seed-{args.seed} experiment\n")
 
     model_kwargs = {
         "num_classes": 10,
@@ -202,7 +209,7 @@ def main() -> None:
     config = vars(args).copy()
     config.update(
         {
-            "phase": "FINAL_CORE",
+            "phase": args.phase,
             "train_size": 45_000,
             "validation_size": 5_000,
             "test_size": 10_000,
@@ -261,7 +268,7 @@ def main() -> None:
     pd.DataFrame(training.history).to_csv(run_dir / "training_history.csv", index=False)
 
     checkpoint_base = {
-        "phase": "FINAL_CORE",
+        "phase": args.phase,
         "model_type": args.model,
         "model_kwargs": model_kwargs,
         "seed": args.seed,
@@ -339,7 +346,7 @@ def main() -> None:
     clean_runtime = time.perf_counter() - clean_started
     test_metrics.update(
         {
-            "phase": "FINAL_CORE",
+            "phase": args.phase,
             "model": args.model,
             "selected_epoch": training.best_epoch,
             "selected_checkpoint_validation_nll": training.best_validation_nll,
@@ -358,7 +365,7 @@ def main() -> None:
     ood_metrics = ood_metrics_from_rows(test_rows, ood_rows, "normalized_predictive_entropy")
     ood_metrics.update(
         {
-            "phase": "FINAL_CORE",
+            "phase": args.phase,
             "positive_class": "OOD",
             "primary_score": "normalized_predictive_entropy",
             "higher_score_meaning": "more OOD-like",
@@ -386,11 +393,12 @@ def main() -> None:
     write_json(run_dir / "ood_metrics.json", ood_metrics)
     ood_runtime = time.perf_counter() - ood_started
 
-    save_figure_inputs(run_dir, test_rows, ood_rows)
-    plot_analysis_figures(run_dir, args.model)
-    selected = choose_representatives(test_rows, ood_rows)
-    write_json(run_dir / "representative_selection.json", selected)
-    plot_representatives(run_dir, args.data_dir, selected)
+    if not args.skip_individual_figures:
+        save_figure_inputs(run_dir, test_rows, ood_rows)
+        plot_analysis_figures(run_dir, args.model)
+        selected = choose_representatives(test_rows, ood_rows)
+        write_json(run_dir / "representative_selection.json", selected)
+        plot_representatives(run_dir, args.data_dir, selected)
 
     runtime = {
         "training_seconds": training.runtime_seconds,
@@ -405,7 +413,7 @@ def main() -> None:
     write_json(
         run_dir / "run_summary.json",
         {
-            "phase": "FINAL_CORE",
+            "phase": args.phase,
             "model": args.model,
             "epochs_completed": len(training.history),
             "selected_epoch": training.best_epoch,
@@ -422,7 +430,7 @@ def main() -> None:
         [str(Path(".venv/bin/python")), "-m", "pip", "freeze"], capture_output=True, text=True, check=True
     ).stdout
     (run_dir / "pip_freeze.txt").write_text(freeze)
-    (run_dir / "COMPLETED").write_text("FINAL_CORE pipeline completed successfully\n")
+    (run_dir / "COMPLETED").write_text(f"{args.phase} pipeline completed successfully\n")
     print(json.dumps({"run_dir": str(run_dir), "summary": str(run_dir / "run_summary.json")}, indent=2), flush=True)
 
 
