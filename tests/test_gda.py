@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from src.daedl_project.gda import class_log_probabilities, density_score, fit_gda, log_density
+from daedl_project.gda import class_log_probabilities, density_score, fit_gda, log_density
 
 
 def test_gda_shapes_cpu_float64_and_density_range():
@@ -25,4 +25,3 @@ def test_gda_shapes_cpu_float64_and_density_range():
 def test_gda_rejects_too_few_samples_for_full_covariance():
     with pytest.raises(ValueError, match="need more than embedding dimension"):
         fit_gda(torch.randn(6, 4), torch.tensor([0, 0, 0, 1, 1, 1]), num_classes=2)
-

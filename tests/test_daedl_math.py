@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 import torch
 
-from src.daedl_project.losses import concentration_from_logits, daedl_loss
-from src.daedl_project.metrics import validate_probabilities
+from daedl_project.losses import concentration_from_logits, daedl_loss
+from daedl_project.metrics import validate_probabilities
 
 
 def test_daedl_concentration_and_predictive_probability():
@@ -38,4 +38,3 @@ def test_daedl_loss_and_gradients_are_finite():
 def test_nonfinite_logits_are_rejected():
     with pytest.raises(FloatingPointError):
         concentration_from_logits(torch.tensor([[float("inf"), 0.0]]))
-

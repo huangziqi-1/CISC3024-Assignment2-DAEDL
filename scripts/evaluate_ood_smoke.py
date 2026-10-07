@@ -8,12 +8,12 @@ from pathlib import Path
 import pandas as pd
 import torch
 
-from src.daedl_project.artifacts import write_json
-from src.daedl_project.data import build_cifar10_loaders, build_svhn_loader
-from src.daedl_project.evaluation import evaluate_model, ood_metrics_from_rows, score_ood_loader
-from src.daedl_project.gda import GDAState
-from src.daedl_project.model import CifarResNet18
-from src.daedl_project.reproducibility import choose_device
+from daedl_project.artifacts import write_json
+from daedl_project.data import build_cifar10_loaders, build_svhn_loader
+from daedl_project.evaluation import evaluate_model, ood_metrics_from_rows, score_ood_loader
+from daedl_project.gda import GDAState
+from daedl_project.model import CifarResNet18
+from daedl_project.reproducibility import choose_device
 
 
 def main() -> None:

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import log_loss
 
-from src.daedl_project.metrics import (
+from daedl_project.metrics import (
     binary_detection_metrics,
     expected_calibration_error,
     multiclass_brier_score,

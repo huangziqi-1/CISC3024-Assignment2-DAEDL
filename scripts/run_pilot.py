@@ -11,18 +11,18 @@ import numpy as np
 import pandas as pd
 import torch
 
-from src.daedl_project.artifacts import (
+from daedl_project.artifacts import (
     create_run_directory,
     environment_record,
     save_predictions,
     write_json,
 )
-from src.daedl_project.data import CIFAR10_MEAN, CIFAR10_STD, build_cifar10_loaders
-from src.daedl_project.evaluation import evaluate_model, fit_daedl_density
-from src.daedl_project.model import CifarResNet18
-from src.daedl_project.plots import plot_reliability_diagram
-from src.daedl_project.reproducibility import DEFAULT_SEED, choose_device, seed_everything
-from src.daedl_project.training import train_model
+from daedl_project.data import CIFAR10_MEAN, CIFAR10_STD, build_cifar10_loaders
+from daedl_project.evaluation import evaluate_model, fit_daedl_density
+from daedl_project.model import CifarResNet18
+from daedl_project.plots import plot_reliability_diagram
+from daedl_project.reproducibility import DEFAULT_SEED, choose_device, seed_everything
+from daedl_project.training import train_model
 
 
 def parse_args() -> argparse.Namespace:
@@ -214,4 +214,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

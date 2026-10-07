@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 
-from src.daedl_project.model import CifarResNet18
-from src.daedl_project.reproducibility import stratified_indices, stratified_subset
+from daedl_project.model import CifarResNet18
+from daedl_project.reproducibility import stratified_indices, stratified_subset
 
 
 def test_split_is_reproducible_stratified_and_disjoint():
@@ -24,4 +24,3 @@ def test_cifar_resnet_exposes_logits_and_128d_embedding():
     assert embedding.shape == (2, 128)
     assert torch.isfinite(logits).all()
     assert torch.isfinite(embedding).all()
-
