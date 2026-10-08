@@ -52,3 +52,6 @@ report/*.log
 report/*.out
 report/*.toc
 report/equations/
+
+# Local editorial notes
+report/HUMANIZATION_CHANGES.md

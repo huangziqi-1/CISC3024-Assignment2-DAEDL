@@ -281,56 +281,109 @@ def build_markdown(aggregate: pd.DataFrame, density: pd.DataFrame, source_url: s
     s_errp, d_errp = value(aggregate, "softmax", "error_aupr"), value(aggregate, "daedl", "error_aupr")
     s_ood, d_ood = value(aggregate, "softmax", "ood_auroc"), value(aggregate, "daedl", "ood_auroc")
     s_oodp, d_oodp = value(aggregate, "softmax", "ood_aupr"), value(aggregate, "daedl", "ood_aupr")
-    source_section = f"\n## 11 Source Code\n\n**Source code:** {source_url}\n" if source_url else ""
-    return fr"""# AI Assisted Implementation and Evaluation of Density Aware Evidential Deep Learning
+    source_section = (
+        "\n## 11 Source Code\n\n"
+        "The complete source code, experiment scripts, configurations, and reproducibility files "
+        f"for this assignment are available at:\n\n**{source_url}**\n"
+        if source_url
+        else ""
+    )
+    references_heading = "## 12 References" if source_url else "## References"
+    return fr"""# Density-Aware Evidential Deep Learning for CIFAR-10 Classification and Uncertainty Estimation
 
-**CISC3024 Pattern Recognition**  
-**AI Assignment #2**  
+**CISC3024 Pattern Recognition**
+
+**AI Assignment #2**
+
+Ziqi Huang
+
 October 2026
 
 ## 1 Introduction
 
 Image classifiers produce probability-like scores, but a high maximum score does not by itself show that the model knows when it may be wrong. This assignment used Codex to identify, implement, and evaluate a recent probability-based recognition method. The selected method was Density Aware Evidential Deep Learning (DAEDL), published at ICML 2024 [1]. The research question was: how does DAEDL compare with a conventional Softmax classifier in classification performance, calibration, prediction-error uncertainty, and out-of-distribution uncertainty in an assignment-scale CIFAR-10 experiment?
 
-The three-seed results show a limited trade-off rather than an overall DAEDL advantage. Softmax achieved higher accuracy ({s_acc} versus {d_acc}) and better NLL and Brier score. DAEDL achieved lower ECE in every seed ({d_ece} versus {s_ece}). Both methods assigned greater entropy to mistakes, while Softmax had a small error-AUROC advantage. SVHN OOD rankings changed by seed, so the experiment did not establish a stable OOD winner.
+The three-seed results show different strengths across the evaluation metrics. Softmax achieved higher accuracy ({s_acc} versus {d_acc}) and better NLL and Brier score. DAEDL achieved lower ECE in every seed ({d_ece} versus {s_ece}). Both methods assigned greater entropy to mistakes, and Softmax had a small error-AUROC advantage. The SVHN OOD ranking changed across seeds, so neither method was consistently better.
 
-## 2 AI Assisted Algorithm Search and Selection
+## 2 AI-Assisted Algorithm Search and Selection
 
-Codex was asked to find a recent classification or recognition algorithm grounded in probability or Bayesian theory. It filtered candidates using publication date, relevance to computer-vision classification, access to a primary paper and implementation, computational feasibility on a laptop, and whether the method supported a clear comparison with a conventional baseline. DAEDL met these criteria because it predicts a Dirichlet distribution, models density in learned feature space, and reports classification, calibration, error detection, and OOD experiments [1].
+Codex searched for recent classification and recognition methods grounded in probability or Bayesian theory. Codex first compared DAEDL with conventional evidential deep learning. The candidates were screened by publication date, probabilistic basis, implementation availability, computational cost, and suitability for a CIFAR-10 comparison. DAEDL was selected because it predicts a Dirichlet distribution, models density in learned feature space, and supports classification, calibration, error-detection, and OOD evaluation [1].
 
-Codex checked the official PMLR record, the paper, and the authors' repository. It did not treat the repository as a ready-made solution: the audit found CUDA assumptions, incomplete environment information, missing released checkpoints, and reproducibility gaps. A clean implementation was therefore used, with the official code serving as a method reference. Conventional evidential deep learning [2] and calibration work [3] supplied the background needed to interpret the method and metrics.
+The search then checked the official PMLR record, the paper, and the authors' repository. Codex used the repository as a method reference and created a separate implementation adapted to this assignment. The repository audit found CUDA assumptions, incomplete environment information, missing released checkpoints, and reproducibility gaps. Conventional evidential deep learning [2] and calibration work [3] supplied the background needed to interpret the method and metrics.
 
 ## 3 Algorithm Description
 
 ### 3.1 Softmax classification
 
-For class logits $z_k(x)$, Softmax forms normalized class probabilities:
+For class logits $z_k(x)$, Softmax forms one normalized categorical probability vector for each input:
 
 $$p_{{soft}}(y=k\mid x)=\frac{{e^{{z_k(x)}}}}{{\sum_j e^{{z_j(x)}}}}.$$
 
+The largest probability determines the predicted class. Softmax does not directly represent uncertainty over the probability vector itself, which motivates the Dirichlet formulation used by evidential classifiers.
+
 ### 3.2 Evidential classification
 
-Evidential classification predicts positive concentrations $\boldsymbol{{\alpha}}(x)$ for a Dirichlet distribution over class-probability vectors $\boldsymbol{{\pi}}$. Its predictive categorical probability is the Dirichlet mean, $\mathbb{{E}}[\pi_k\mid x]=\alpha_k/S$, where $S=\sum_j\alpha_j$. Strength describes concentration, but this project used normalized predictive entropy as the common uncertainty score so that Softmax and DAEDL were compared on the same quantity.
+Evidential classification predicts positive concentrations $\boldsymbol{{\alpha}}(x)$ for a Dirichlet distribution over class-probability vectors $\boldsymbol{{\pi}}$. Its predictive categorical probability is the Dirichlet mean, $\mathbb{{E}}[\pi_k\mid x]=\alpha_k/S$, where $S=\sum_j\alpha_j$. A larger total concentration $S$ places more Dirichlet mass around the mean probability vector; a smaller value represents weaker evidence. This project used normalized predictive entropy as the common uncertainty score so that Softmax and DAEDL were compared on the same quantity.
 
 ### 3.3 DAEDL training and density-aware prediction
 
 DAEDL uses $\alpha_k=e^{{z_k}}$ during training. Normalizing these concentrations gives the same class probabilities as Softmax, while the loss adds the expected squared-error and predictive-variance terms of the Dirichlet plus a KL penalty for misleading evidence. After training, the implementation fits class-conditional full-covariance Gaussian distributions to the 128-dimensional penultimate embeddings. The class mixture defines a feature density, which is min-max normalized against training log densities and clipped to $[0,1]$.
 
-At inference, the density score $s(x)$ scales the logits before concentrations are formed: $\alpha_k(x)=\exp(s(x)z_k(x))$. A low-density input drives $s(x)$ toward zero, so the expected class probabilities move toward a uniform distribution. Spectral normalization is applied to both compared models in this project so that the backbone treatment is matched; for DAEDL it also supports a smoother feature geometry for density estimation.
+At inference, the density score $s(x)$ scales the logits before concentrations are formed: $\alpha_k(x)=\exp(s(x)z_k(x))$. An embedding far from the fitted training distribution receives a small density score. This moves the concentrations toward one and the expected class probabilities toward a uniform distribution. Spectral normalization is applied to both compared models so that the backbone treatment is matched; for DAEDL it also supports a smoother feature geometry for density estimation.
 
 ![Figure 1 DAEDL concept](../figures/final/figure1_daedl_concept.png)
 
-## 4 AI Assisted Implementation
+## 4 AI-Assisted Implementation
 
-Codex inspected the paper and official code, created an isolated Python 3.11 environment, and implemented the data pipeline, CIFAR-adapted ResNet-18, Softmax and DAEDL losses, CPU float64 GDA, metrics, artifact logging, and plots. Automated tests covered probability normalization, DAEDL gradients, ECE, NLL, Brier score, score direction, GDA fitting, split reproducibility, and model shapes.
+### 4.1 Project and environment setup
 
-The pilot exposed two important engineering issues. Reloaded spectral-normalized models could produce non-finite outputs on the observed PyTorch MPS evaluation path, although CPU evaluation of the same checkpoint was finite. Final training therefore used MPS, while checkpoint evaluation, feature extraction, and DAEDL density fitting used CPU. Full-covariance matrices were rank deficient because some ReLU embedding coordinates were constant. The implementation used scale-relative diagonal loading and recorded rank, jitter, density range, and non-finite fractions instead of changing the architecture after seeing results.
+Codex created an isolated Python 3.11.5 environment with PyTorch 2.14.1 and torchvision 0.29.1 on an Apple M5 MacBook Air with 16 GB unified memory. The project code covers data loading, model construction, Softmax and DAEDL training, density fitting, evaluation, artifact logging, and report figures. Neural-network training used MPS. Selected checkpoints were evaluated on CPU, and DAEDL density estimation used CPU float64 because the MPS backend cannot store float64 tensors [6].
 
-Codex also enforced matched splits within each seed, minimum validation-NLL checkpoint selection, OOD-positive score orientation, probability-sum checks, checkpoint round trips, and metric recomputation from saved predictions. All 16 automated tests and the final six-run consistency audit passed.
+The pilot also found that a reloaded spectral-normalized checkpoint could produce non-finite outputs on the observed MPS evaluation path while the same weights were finite on CPU. The final protocol therefore used the same CPU checkpoint-evaluation policy for both models.
+
+### 4.2 Data pipeline
+
+Each CIFAR-10 example retained its original sample index so that splits and predictions could be audited. The 50,000 official training images were divided into a stratified 45,000-image training set and 5,000-image validation set. Training used random 32-by-32 crops with four-pixel padding, random horizontal flips, tensor conversion, and channel normalization with mean $(0.4914, 0.4822, 0.4465)$ and standard deviation $(0.2023, 0.1994, 0.2010)$. Validation, test, and density fitting used only tensor conversion and the same normalization.
+
+The code saved the train, validation, and test indices for every run. Python, NumPy, PyTorch, and the data-loader generator were seeded. Within a seed, Softmax and DAEDL used identical indices; across seeds, the split and training randomness changed according to the recorded seed.
+
+### 4.3 Model implementation
+
+Both methods used the same CIFAR-adapted ResNet-18. It has a 3-by-3 stride-one stem, base width 32, four residual stages, adaptive average pooling, a 128-dimensional ReLU embedding, and a ten-class linear classifier. The forward method exposes both logits and embeddings because DAEDL needs the embeddings after training.
+
+Spectral normalization was applied to every convolution, learned shortcut projection, the embedding layer, and the classifier for both models. Sharing the feature extractor, data pipeline, and training budget keeps the comparison focused on the prediction and uncertainty mechanisms. Softmax uses cross-entropy. DAEDL uses its evidential objective, followed by feature-density fitting and density-aware inference.
+
+### 4.4 DAEDL density estimation
+
+Density estimation begins after neural-network training. The selected checkpoint is loaded on CPU, and clean embeddings are extracted from all 45,000 training images. The implementation then fits one full-covariance Gaussian per class, using empirical class proportions as mixture weights. The minimum and maximum training log densities define the clipped score $s(x)$ used at inference.
+
+All covariance calculations use CPU float64. Each covariance is symmetrized, and scale-relative diagonal jitter with an absolute floor of $10^{{-8}}$ is increased until Cholesky factorization succeeds. The run artifacts record global and per-class ranks, constant dimensions, jitter, the training density range, and non-finite fractions. The fitted GDA state and per-example training density values are also saved.
+
+### 4.5 Staged implementation workflow
+
+The implementation was validated in stages. A two-epoch pilot used 5,000 training, 1,000 validation, and 1,000 test images to check finite losses and gradients, checkpoint reloads, GDA fitting, metrics, and artifact output. The first full experiment then trained both models on seed 3024 and evaluated classification, calibration, prediction errors, SVHN OOD detection, and density diagnostics. After those checks passed, the same configuration was then used for seeds 3025 and 3026.
+
+### 4.6 Validation, testing, and reproducibility
+
+The 16 automated tests cover four groups. Probability and loss tests check positive concentrations, normalized probabilities, and finite DAEDL losses and gradients. Metric tests check NLL, Brier score, ECE, entropy, and AUROC/AUPR direction. Density tests cover shapes, CPU float64 state, rank-deficient covariance handling, and finite scores. Reproducibility tests cover stratified disjoint splits, exposed model outputs, and spectral-normalization coverage.
+
+Every final run saved its configuration, environment, split indices, progress log, training history, best-validation and final checkpoints, per-example CIFAR-10 and SVHN predictions, metrics, runtime, and DAEDL density diagnostics where applicable. Aggregate tables were recomputed from the saved predictions. The final six-run audit verified matched within-seed splits, checkpoint selection, probability normalization, finite outputs, positive DAEDL concentrations, score direction, density stability, and sample-SD aggregation.
 
 ## 5 Experimental Setup
 
-CIFAR-10 provided 45,000 training images, 5,000 validation images, and the untouched official 10,000-image test set [4]. SVHN supplied 10,000 deterministically selected OOD test images [5]. Both models used the same spectrally normalized CIFAR ResNet-18, 128-dimensional embedding, augmentation, optimizer, schedule, and epoch budget. Seeds 3024, 3025, and 3026 controlled the stratified split and training randomness. Results are mean ± sample standard deviation across training seeds, not across individual test images.
+### 5.1 Datasets and split
+
+CIFAR-10 contains ten natural-object classes with 50,000 official training images and 10,000 official test images [4]. The training portion was divided into a stratified 45,000-image training set and 5,000-image validation set. Validation NLL selected checkpoints, while the official test set remained outside model selection.
+
+SVHN supplied 10,000 deterministically selected test images for OOD evaluation [5]. CIFAR-10 contains natural objects; SVHN contains street-view house-number digits. Their visual domains and semantic classes differ, making SVHN a useful OOD dataset for this controlled comparison without implying that it is the only possible benchmark.
+
+### 5.2 Fair comparison design
+
+Softmax and DAEDL shared the same backbone, spectral-normalization configuration, split, training augmentation, batch size, optimizer, epoch budget, learning-rate schedule, and checkpoint criterion within each seed. These controls reduce differences caused by the feature extractor or training resources. DAEDL necessarily differs in its evidential objective, post-training density model, and density-aware inference.
+
+### 5.3 Training protocol
+
+Each run trained for 30 epochs with batch size 64, AdamW, an initial learning rate of $10^{{-3}}$, weight decay $5\times10^{{-4}}$, and cosine decay to $10^{{-5}}$. Both models selected the checkpoint with minimum validation NLL. This provides a common probability-based criterion even though their training objectives differ. The best-validation checkpoint and the final-epoch checkpoint were both saved, and the test set was never used for selection.
 
 | Setting | Value |
 |---|---|
@@ -346,6 +399,39 @@ CIFAR-10 provided 45,000 training images, 5,000 validation images, and the untou
 | Hardware | Apple M5 MacBook Air, 16 GB unified memory |
 | Devices | MPS training; CPU evaluation and float64 GDA |
 | OOD protocol | CIFAR-10 ID, SVHN OOD, normalized entropy, OOD positive |
+
+### 5.4 Three-seed replication
+
+Seeds 3024, 3025, and 3026 each defined a complete model run. The seed controlled the stratified train-validation split, Python and NumPy random states, PyTorch initialization and training randomness, and the data-loader generator. Softmax and DAEDL shared indices within each seed. Results are reported as mean ± sample SD across the three runs, not across individual images. Three seeds were used to check whether the comparison remained consistent under different data splits and training randomness.
+
+### 5.5 Classification evaluation
+
+Accuracy is the fraction of correct CIFAR-10 predictions. Macro F1 averages class-level F1 scores with equal weight for each class. CIFAR-10 is balanced, but Macro F1 still checks whether performance is distributed across classes instead of relying only on total accuracy.
+
+### 5.6 Calibration evaluation
+
+Negative log-likelihood uses the probability assigned to the true class and gives a large penalty to confident mistakes. ECE divides predictions into 15 equal-width confidence bins and computes the count-weighted difference between mean confidence and observed accuracy in each bin. The multiclass Brier score is the mean squared difference between the predicted probability vector and the one-hot target. Using all three metrics gives a broader view of probability quality than relying on a single calibration measure.
+
+### 5.7 Prediction-error uncertainty
+
+This experiment asks whether uncertainty can identify predictions that are likely to be wrong. Correct and incorrect CIFAR-10 predictions are separated using the ground-truth labels. Normalized predictive entropy lies in $[0,1]$; larger values indicate a more diffuse class distribution. Prediction error is the positive class. AUROC measures ranking across thresholds, and AUPR summarizes precision-recall performance for the error class.
+
+### 5.8 OOD evaluation
+
+The OOD experiment asks whether the models assign greater uncertainty to inputs outside the CIFAR-10 distribution. CIFAR-10 is labelled ID, SVHN is labelled OOD, and OOD is the positive class. Normalized predictive entropy is the common score for both models, which avoids comparing method-specific scales. DAEDL's secondary score, $1-s(x)$, is evaluated separately as density-derived uncertainty.
+
+### 5.9 Numerical stability and device policy
+
+Training used MPS, while loaded-checkpoint evaluation and feature extraction used CPU for both models. DAEDL covariance and density calculations used CPU float64, adaptive diagonal jitter, and Cholesky checks. Evaluation also checked finite outputs, probability sums, positive concentrations, density bounds, and score orientation before aggregation.
+
+### 5.10 Experiment questions
+
+| Experiment | Main question | Metrics |
+|---|---|---|
+| Classification | How accurately does the model classify CIFAR-10? | Accuracy, Macro F1 |
+| Calibration | Do predicted probabilities match empirical correctness? | NLL, ECE, Brier |
+| Error uncertainty | Can uncertainty identify incorrect predictions? | Entropy, AUROC, AUPR |
+| OOD uncertainty | Can uncertainty distinguish CIFAR-10 from SVHN? | Entropy, AUROC, AUPR |
 
 ## 6 Results
 
@@ -363,7 +449,7 @@ Softmax was about one percentage point more accurate in every seed. DAEDL's lowe
 
 ![Figure 2 three-seed headline metrics](../figures/final/figure2_three_seed_headline.png)
 
-The seed-3024 reliability diagram illustrates the binned behavior behind ECE. Sparse bins with fewer than 50 test examples are suppressed for readability; the metric itself still uses all 15 equal-width bins.
+The plot shows seed 3024 as an example. Bins with fewer than 50 test examples are suppressed for readability, while ECE is calculated from all 15 equal-width bins.
 
 ![Figure 3 reliability](../figures/final/figure3_reliability_seed3024.png)
 
@@ -376,27 +462,27 @@ The seed-3024 reliability diagram illustrates the binned behavior behind ECE. Sp
 | SVHN OOD AUROC | {s_ood} | {d_ood} |
 | SVHN OOD AUPR | {s_oodp} | {d_oodp} |
 
-Both models assigned much greater normalized entropy to incorrect predictions than to correct ones. Softmax had a small but consistent error-AUROC advantage. DAEDL's larger absolute entropy does not itself mean that it separates errors better; AUROC measures ranking quality and is therefore more suitable for that comparison.
+Both models assigned much greater normalized entropy to incorrect predictions than to correct ones. Softmax had a small but consistent error-AUROC advantage. DAEDL produced larger entropy values, while AUROC showed how well each score ranked incorrect predictions above correct ones.
 
-DAEDL consistently assigned greater entropy to SVHN than to CIFAR-10. However, Softmax had higher OOD AUROC at seeds 3024 and 3026, while DAEDL was higher at seed 3025. The aggregate difference therefore does not justify a stable superiority claim for either model.
+DAEDL consistently assigned greater entropy to SVHN than to CIFAR-10. Softmax had higher OOD AUROC at seeds 3024 and 3026; DAEDL was higher at seed 3025. Neither method was consistently better across the three seeds.
 
 ![Figure 4 entropy distributions](../figures/final/figure4_entropy_distributions_seed3024.png)
 
 ## 7 Discussion
 
-DAEDL added a structured probabilistic representation without improving clean classification. Its lower ECE shows that one aspect of confidence-frequency agreement improved, yet its worse NLL and Brier score show that the full probability vectors were less effective under two proper scoring rules. Reporting only ECE would therefore have produced an incomplete calibration conclusion.
+Softmax achieved higher clean classification accuracy in all three seeds. In this setup, DAEDL's uncertainty modelling did not improve classification performance. DAEDL consistently achieved lower ECE, whereas Softmax achieved lower NLL and Brier scores. These metrics can disagree because ECE measures binned confidence-frequency agreement, while NLL and Brier score evaluate the full probability distribution.
 
-The uncertainty magnitudes also require care. DAEDL produced higher entropy for correct, incorrect, ID, and OOD samples. That wider numerical range made mistakes and SVHN inputs visibly uncertain, but it did not reliably improve discrimination AUROC. The practical question is not simply whether a method emits a larger uncertainty number; it is whether that number ranks errors or distribution shifts consistently.
+DAEDL produced higher entropy for correct, incorrect, ID, and OOD samples. That wider numerical range made mistakes and SVHN inputs visibly uncertain. AUROC, however, depends on how consistently the score ranks errors or distribution shifts, and DAEDL did not improve that ranking consistently.
 
-Multiple seeds changed the interpretation of OOD performance. Seed 3024 alone suggested a clear Softmax advantage, whereas seed 3025 reversed the order. The three-seed aggregate still favors Softmax numerically, but the change in direction limits the claim to this observed average. No hypothesis test was added for three runs because descriptive consistency is more appropriate at this scale.
+Multiple seeds changed the interpretation of OOD performance. Seed 3024 favored Softmax, seed 3025 favored DAEDL, and seed 3026 favored Softmax. The three-seed mean favored Softmax, but the ordering was not consistent. With only three runs, the comparison is reported descriptively without a hypothesis test.
 
-The density diagnostics show another trade-off. DAEDL embeddings remained rank deficient: global centered rank was 93, 99, and 101 out of 128, with 35, 29, and 27 constant dimensions. Per-class covariance ranks ranged from 76 to 95. Adaptive jitter remained around $10^{{-8}}$ to $10^{{-7}}$, and every density computation was finite. This supports using the results while reporting the reduced-rank feature space as a limitation.
+The density diagnostics show another trade-off. DAEDL embeddings remained rank deficient: global centered rank was 93, 99, and 101 out of 128, with 35, 29, and 27 constant dimensions. Per-class covariance ranks ranged from 76 to 95. Adaptive jitter remained around $10^{{-8}}$ to $10^{{-7}}$, and every density computation was finite. Density fitting remained numerically stable, although the reduced embedding rank is a limitation of this implementation.
 
-The experiment is an assignment-scale evaluation rather than an exact reproduction of the ICML study. The paper used a different architecture and larger training setup. Here, the compact ResNet-18, 128-dimensional embedding, 30 epochs, and laptop hardware made matched multi-seed experiments feasible. The local results answer the coursework research question but do not contradict or reproduce the paper's broader benchmarks.
+This is an assignment-scale evaluation of DAEDL's central ideas. The paper used a different architecture and larger training setup. Here, the compact ResNet-18, 128-dimensional embedding, 30 epochs, and laptop hardware made matched multi-seed experiments feasible. The results apply to this local setup and are not an exact reproduction of the paper's broader benchmarks.
 
 ## 8 Limitations
 
-The evaluation uses one in-distribution dataset, one OOD dataset, and three seeds. It does not cover every corruption type, architecture, or alternative evidential method. No exhaustive hyperparameter search was performed, and settings were frozen before replications to avoid tuning to seed 3024. MPS and CPU adaptations introduce an engineering difference from the authors' CUDA-oriented environment. DAEDL's embedding space was rank deficient even though covariance stabilization remained finite. The study therefore supports claims about this controlled CIFAR-10/SVHN setup only.
+The evaluation uses one in-distribution dataset, one OOD dataset, and three seeds. Corruption experiments were outside the final scope of this assignment. No exhaustive hyperparameter search was performed, and the study did not cover other architectures or alternative evidential methods. MPS and CPU adaptations introduce an engineering difference from the authors' CUDA-oriented environment. DAEDL's embedding space was rank deficient even though covariance stabilization remained finite. The findings apply to this controlled CIFAR-10/SVHN setup.
 
 ## 9 What I Learned
 
@@ -404,19 +490,19 @@ Before this assignment, I tended to read a classifier's probability as a direct 
 
 I learned that calibration is not a single number. DAEDL had lower ECE in every seed, which initially looks like a clear calibration advantage. NLL and Brier score gave the opposite ranking. This result helped me understand that ECE depends on confidence bins, while proper scoring rules evaluate the full probability distribution and penalize confident errors differently. I should therefore explain which calibration property a metric measures instead of using “better calibrated” without qualification.
 
-I also expected a method designed for uncertainty to outperform Softmax clearly on OOD detection. The seed results showed that this expectation was too simple. Softmax was better at seed 3024, DAEDL was better at seed 3025, and Softmax was better again at seed 3026. Had I stopped after the first run, I would have described the OOD comparison too confidently. Repeating the experiment did not merely make the result look more reliable; it changed the conclusion I was allowed to make.
+I also expected a method designed for uncertainty to outperform Softmax clearly on OOD detection. The result at seed 3024 initially pointed in the other direction. After running the other two seeds, my interpretation changed: DAEDL was better at seed 3025, while Softmax was better again at seed 3026. The full result was mixed across seeds.
 
-The project also taught me that a larger uncertainty value is not automatically more useful. DAEDL produced much greater entropy on incorrect and SVHN inputs, but Softmax had slightly better error AUROC and a higher mean OOD AUROC. The separation between groups matters more than the absolute scale. This distinction is especially important when comparing models whose uncertainty scores arise from different parameterizations.
+The project also taught me to separate uncertainty magnitude from ranking quality. DAEDL produced much greater entropy on incorrect and SVHN inputs. Softmax still had slightly better error AUROC and a higher mean OOD AUROC. The separation between groups matters more than the absolute scale when models use different uncertainty parameterizations.
 
-Using Codex did not remove the need for validation. Codex wrote the code and ran the experiments, but the workflow still needed tests for formulas and metrics, matched baselines, fixed checkpoint rules, checks for OOD score direction, probability normalization, and independent recomputation from saved predictions. The most useful AI behavior was not rapid code generation alone. It was the ability to inspect failures, record what changed, and preserve negative or mixed results rather than tuning them away.
+Codex wrote the code and ran the experiments. I found it especially useful for debugging and checking the experiment, not only for generating code. The workflow still needed tests for formulas and metrics, matched baselines, fixed checkpoint rules, checks for OOD score direction, probability normalization, and independent recomputation from saved predictions. It also helped me inspect failures, record changes, and keep mixed results in the final analysis.
 
-Finally, I learned how theoretical ideas meet hardware and numerical constraints. MPS was suitable for neural-network training but not float64 covariance calculations. Reloaded spectral-normalized checkpoints also required a CPU evaluation policy in this environment. The embedding covariances were rank deficient, so the implementation needed adaptive diagonal loading and diagnostics. These issues made reproducibility, saved provenance, and numerical checks part of the pattern-recognition experiment rather than optional software details.
+Finally, I learned how theoretical ideas meet hardware and numerical constraints. MPS was suitable for neural-network training but could not run the float64 covariance calculations. Reloaded spectral-normalized checkpoints also required CPU evaluation in this environment. The embedding covariances were rank deficient, so the implementation needed adaptive diagonal loading and diagnostics. These hardware and numerical checks became part of the experimental workflow.
 
 ## 10 Conclusion
 
-Codex successfully implemented DAEDL and compared it with a matched Softmax baseline across three CIFAR-10 seeds. DAEDL consistently reduced ECE, while Softmax remained stronger in accuracy, Macro F1, NLL, Brier score, and error-detection AUROC. Both methods assigned greater uncertainty to mistakes, and DAEDL assigned greater entropy to SVHN than CIFAR-10, but the OOD method ranking was not stable. The experiment therefore shows both the value and the limits of structured probabilistic uncertainty modelling: greater model complexity did not improve every predictive or uncertainty measure.
+Codex implemented DAEDL and compared it with a matched Softmax baseline across three CIFAR-10 seeds. DAEDL consistently reduced ECE. Softmax achieved better accuracy, Macro F1, NLL, Brier score, and error-detection AUROC. Both methods assigned greater uncertainty to mistakes, and DAEDL assigned greater entropy to SVHN than CIFAR-10. The OOD ranking changed across seeds, and the added probabilistic structure did not improve every predictive or uncertainty measure.
 {source_section}
-## References
+{references_heading}
 
 [1] Yoon, T., and Kim, H. (2024). “Uncertainty Estimation by Density Aware Evidential Deep Learning.” *Proceedings of the 41st International Conference on Machine Learning*, PMLR 235, 57217–57243. https://proceedings.mlr.press/v235/yoon24a.html
 
@@ -426,7 +512,7 @@ Codex successfully implemented DAEDL and compared it with a matched Softmax base
 
 [4] Krizhevsky, A. (2009). *Learning Multiple Layers of Features from Tiny Images*. Technical report, University of Toronto. https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf
 
-[5] Netzer, Y., Wang, T., Coates, A., Bissacco, A., Wu, B., and Ng, A. Y. (2011). “Reading Digits in Natural Images with Unsupervised Feature Learning.” *NIPS Workshop on Deep Learning and Unsupervised Feature Learning*. https://ufldl.stanford.edu/housenumbers/nips2011_housenumbers.pdf
+[5] Netzer, Y., Wang, T., Coates, A., Bissacco, A., Wu, B., and Ng, A. Y. (2011). “Reading Digits in Natural Images with Unsupervised Feature Learning.” *NIPS Workshop on Deep Learning and Unsupervised Feature Learning*. https://cs.stanford.edu/~twangcat/papers/nips2011_housenumbers.pdf
 
 [6] PyTorch Contributors. “MPS backend.” *PyTorch documentation*. https://docs.pytorch.org/docs/main/notes/mps.html
 
@@ -442,38 +528,36 @@ def build_docx(aggregate: pd.DataFrame, density: pd.DataFrame, source_url: str |
     remove_paragraph_border(title)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.paragraph_format.space_before = Pt(120)
-    title.add_run("AI Assisted Implementation and Evaluation of\nDensity Aware Evidential Deep Learning")
+    title.add_run("Density-Aware Evidential Deep Learning for CIFAR-10\nClassification and Uncertainty Estimation")
     subtitle = document.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     subtitle.paragraph_format.space_before = Pt(16)
     run = subtitle.add_run("CISC3024 Pattern Recognition\nAI Assignment #2")
     run.bold = True
     run.font.size = Pt(15)
+    name = document.add_paragraph("Ziqi Huang")
+    name.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    name.paragraph_format.space_before = Pt(18)
     date = document.add_paragraph("October 2026")
     date.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    date.paragraph_format.space_before = Pt(22)
-    note = document.add_paragraph("Prepared through an AI-assisted workflow with Codex")
-    note.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    note.paragraph_format.space_before = Pt(130)
-    note.runs[0].font.size = Pt(9.5)
-    note.runs[0].font.color.rgb = RGBColor(80, 80, 80)
+    date.paragraph_format.space_before = Pt(8)
     document.add_page_break()
 
     document.add_heading("1 Introduction", level=1)
     paragraph(document, "Image classifiers produce probability-like scores, but a high maximum score does not by itself show that the model knows when it may be wrong. This assignment used Codex to identify, implement, and evaluate a recent probability-based recognition method. The selected method was Density Aware Evidential Deep Learning (DAEDL), published at ICML 2024 [1].")
     paragraph(document, "The research question was: how does DAEDL compare with a conventional Softmax classifier in classification performance, calibration, prediction-error uncertainty, and out-of-distribution uncertainty in an assignment-scale CIFAR-10 experiment?")
-    paragraph(document, f"The three-seed results show a limited trade-off rather than an overall DAEDL advantage. Softmax achieved higher accuracy ({value(aggregate, 'softmax', 'accuracy')} versus {value(aggregate, 'daedl', 'accuracy')}) and better NLL and Brier score. DAEDL achieved lower ECE in every seed ({value(aggregate, 'daedl', 'ece_15')} versus {value(aggregate, 'softmax', 'ece_15')}). Both methods assigned greater entropy to mistakes, while Softmax had a small error-AUROC advantage. SVHN OOD rankings changed by seed, so the experiment did not establish a stable OOD winner.")
+    paragraph(document, f"The three-seed results show different strengths across the evaluation metrics. Softmax achieved higher accuracy ({value(aggregate, 'softmax', 'accuracy')} versus {value(aggregate, 'daedl', 'accuracy')}) and better NLL and Brier score. DAEDL achieved lower ECE in every seed ({value(aggregate, 'daedl', 'ece_15')} versus {value(aggregate, 'softmax', 'ece_15')}). Both methods assigned greater entropy to mistakes, and Softmax had a small error-AUROC advantage. The SVHN OOD ranking changed across seeds, so neither method was consistently better.")
 
-    document.add_heading("2 AI Assisted Algorithm Search and Selection", level=1)
-    paragraph(document, "Codex was asked to find a recent classification or recognition algorithm grounded in probability or Bayesian theory. It filtered candidates using publication date, relevance to computer-vision classification, access to a primary paper and implementation, computational feasibility on a laptop, and whether the method supported a clear comparison with a conventional baseline.")
-    paragraph(document, "DAEDL met these criteria because it predicts a Dirichlet distribution, models density in learned feature space, and reports classification, calibration, error detection, and OOD experiments [1]. It was recent, directly relevant to image recognition, and small enough to adapt into a controlled CIFAR-10 study.")
-    paragraph(document, "Codex checked the official PMLR record, the paper, and the authors' repository. It did not treat the repository as a ready-made solution: the audit found CUDA assumptions, incomplete environment information, missing released checkpoints, and reproducibility gaps. A clean implementation was therefore used, with the official code serving as a method reference [7]. Conventional evidential deep learning [2] and calibration work [3] supplied the background needed to interpret the method and metrics.")
+    document.add_heading("2 AI-Assisted Algorithm Search and Selection", level=1)
+    paragraph(document, "Codex searched for recent classification and recognition methods grounded in probability or Bayesian theory. Codex first compared DAEDL with conventional evidential deep learning. The candidates were screened by publication date, probabilistic basis, implementation availability, computational cost, and suitability for a CIFAR-10 comparison.")
+    paragraph(document, "DAEDL was selected because it predicts a Dirichlet distribution, models density in learned feature space, and supports classification, calibration, error-detection, and OOD evaluation [1]. It was recent, directly relevant to image recognition, and small enough to adapt into a controlled CIFAR-10 study.")
+    paragraph(document, "The search then checked the official PMLR record, the paper, and the authors' repository. Codex used the repository as a method reference and created a separate implementation adapted to this assignment [7]. The repository audit found CUDA assumptions, incomplete environment information, missing released checkpoints, and reproducibility gaps. Conventional evidential deep learning [2] and calibration work [3] supplied the background needed to interpret the method and metrics.")
 
     document.add_heading("3 Algorithm Description", level=1)
     document.add_heading("3.1 Softmax classification", level=2)
     paragraph(document, "A neural classifier maps an input image x to class logits. Softmax exponentiates and normalizes those logits to obtain one probability vector. The largest entry determines the predicted class. The operation guarantees non-negative probabilities summing to one, but it does not model a distribution over possible probability vectors.")
     add_equation(document, "equation1_probabilities.png", 6.1)
-    paragraph(document, "The second expression above is the evidential counterpart. A Dirichlet random variable π represents uncertainty over categorical probability vectors, and its mean gives the predictive class probability. The total concentration S controls how tightly the Dirichlet mass is concentrated.")
+    paragraph(document, "The second expression above is the evidential counterpart. A Dirichlet random variable π represents uncertainty over categorical probability vectors, and its mean gives the predictive class probability. A larger total concentration S places more mass around that mean probability vector; a smaller value represents weaker evidence.")
 
     document.add_heading("3.2 Evidential training", level=2)
     paragraph(document, "Conventional EDL converts non-negative evidence into Dirichlet concentrations and trains a deterministic neural network to predict evidence [2]. DAEDL changes the training parameterization to an exponential of each logit. Once normalized by total strength, these concentrations produce exactly the Softmax probabilities during training. The loss combines expected squared classification error, predictive variance, and a KL regularizer that suppresses misleading evidence.")
@@ -483,26 +567,52 @@ def build_docx(aggregate: pd.DataFrame, density: pd.DataFrame, source_url: str |
     document.add_heading("3.3 Feature density", level=2)
     paragraph(document, "After neural-network training, DAEDL extracts the 128-dimensional penultimate feature h(x) for every training image. A full-covariance Gaussian is fitted to each class, and the empirical class proportions form a mixture density. Training log-density extrema define a clipped score s(x) between zero and one.")
     add_equation(document, "equation3_density.png", 6.45)
-    paragraph(document, "A test embedding near the fitted training features receives a larger density score. A distant embedding receives a smaller score. Because full covariance and log-density calculations are sensitive to numerical precision, the implementation performs this stage on CPU in float64 and adds scale-relative diagonal jitter when Cholesky factorization requires it.")
+    paragraph(document, "A test embedding near the fitted training features receives a larger density score. An embedding far from the fitted distribution receives a smaller score and therefore weaker evidence at prediction time. Because full covariance and log-density calculations are sensitive to numerical precision, the implementation performs this stage on CPU in float64 and adds scale-relative diagonal jitter when Cholesky factorization requires it.")
 
     document.add_heading("3.4 Density aware prediction", level=2)
     paragraph(document, "At inference, DAEDL multiplies each logit by the density score before constructing the Dirichlet concentrations. This is equivalent to an input-dependent temperature. As the score approaches zero, all concentrations approach one and the expected probabilities approach the uniform distribution.")
     add_equation(document, "equation4_inference.png", 6.25)
-    paragraph(document, "This project used normalized predictive entropy as the primary common uncertainty score. The normalization places entropy in [0,1] for both methods, so the same error-detection and OOD metric code can be used.")
+    paragraph(document, "This project used normalized predictive entropy to compare uncertainty across the two methods. The normalization places entropy in [0,1], so the same error-detection and OOD metric code can be used.")
     add_equation(document, "equation5_entropy.png", 3.2)
 
     add_caption(document, "Figure 1", "DAEDL inference pipeline used in this project. The diagram is original and was generated from the implemented method.")
     add_figure(document, FIGURES / "figure1_daedl_concept.png", 6.7)
 
-    document.add_heading("4 AI Assisted Implementation", level=1)
-    paragraph(document, "Codex inspected the paper and official code, created an isolated Python 3.11 environment, and implemented the complete project. The code includes fixed stratified splits, indexed datasets, train-only augmentation, a CIFAR-adapted ResNet-18, Softmax cross-entropy, the DAEDL objective, CPU GDA, evaluation metrics, artifact logging, and plotting. Automated tests cover probability normalization, DAEDL gradients, calibration metrics, score direction, GDA fitting, split reproducibility, and model output shapes.")
-    paragraph(document, "The pilot exposed a PyTorch MPS issue: reloaded spectral-normalized models could produce non-finite outputs during the observed post-training evaluation path, although CPU evaluation of the same checkpoint was finite. Final training therefore used MPS, while checkpoint evaluation and feature extraction used CPU. PyTorch documents that MPS cannot store float64 tensors, which independently requires the GDA stage to run on CPU [6].")
-    paragraph(document, "Full-covariance matrices were rank deficient because some ReLU embedding coordinates were constant. The implementation used scale-relative diagonal loading and recorded global rank, per-class rank, jitter, training density range, and non-finite fraction. It did not change the architecture after seeing seed-3024 results. A training-only sensitivity check on that seed showed that removing globally constant dimensions did not materially change the primary outputs.")
-    paragraph(document, "For experimental validity, Codex applied identical splits to both models within each seed, selected checkpoints by minimum validation NLL, saved both selected and final checkpoints, kept the test set out of model selection, and defined OOD as the positive class. Every final probability row, checkpoint label, metric, and density diagnostic was checked. The six-run audit and all 16 automated tests passed.")
+    document.add_heading("4 AI-Assisted Implementation", level=1)
+    document.add_heading("4.1 Project and environment setup", level=2)
+    paragraph(document, "Codex created an isolated Python 3.11.5 environment with PyTorch 2.14.1 and torchvision 0.29.1 on an Apple M5 MacBook Air with 16 GB unified memory. The implementation covers data loading, model construction, Softmax and DAEDL training, density fitting, evaluation, artifact logging, and report figures.")
+    paragraph(document, "Neural-network training used MPS. Selected checkpoints were evaluated on CPU, and DAEDL density estimation used CPU float64 because the MPS backend cannot store float64 tensors [6]. The pilot also found that a reloaded spectral-normalized checkpoint could produce non-finite outputs on the observed MPS evaluation path while the same weights were finite on CPU. The final protocol used the same CPU checkpoint-evaluation policy for both models.")
+
+    document.add_heading("4.2 Data pipeline", level=2)
+    paragraph(document, "Each CIFAR-10 example retained its original sample index so that splits and predictions could be audited. The 50,000 official training images were divided into a stratified 45,000-image training set and 5,000-image validation set. Training used random 32-by-32 crops with four-pixel padding, random horizontal flips, tensor conversion, and channel normalization with mean (0.4914, 0.4822, 0.4465) and standard deviation (0.2023, 0.1994, 0.2010). Validation, test, and density fitting used only tensor conversion and the same normalization.")
+    paragraph(document, "The code saved the train, validation, and test indices for every run. Python, NumPy, PyTorch, and the data-loader generator were seeded. Within a seed, Softmax and DAEDL used identical indices; across seeds, the split and training randomness changed according to the recorded seed.")
+
+    document.add_heading("4.3 Model implementation", level=2)
+    paragraph(document, "Both methods used the same CIFAR-adapted ResNet-18. It has a 3-by-3 stride-one stem, base width 32, four residual stages, adaptive average pooling, a 128-dimensional ReLU embedding, and a ten-class linear classifier. The forward method exposes both logits and embeddings because DAEDL needs the embeddings after training.")
+    paragraph(document, "Spectral normalization was applied to every convolution, learned shortcut projection, the embedding layer, and the classifier for both models. Sharing the feature extractor, data pipeline, and training budget keeps the comparison focused on the prediction and uncertainty mechanisms. Softmax uses cross-entropy. DAEDL uses its evidential objective, followed by feature-density fitting and density-aware inference.")
+
+    document.add_heading("4.4 DAEDL density estimation", level=2)
+    paragraph(document, "Density estimation begins after neural-network training. The selected checkpoint is loaded on CPU, and clean embeddings are extracted from all 45,000 training images. The implementation fits one full-covariance Gaussian per class and uses empirical class proportions as mixture weights. The minimum and maximum training log densities define the clipped score s(x) used at inference.")
+    paragraph(document, "All covariance calculations use CPU float64. Each covariance is symmetrized, and scale-relative diagonal jitter with an absolute floor of 1e-8 is increased until Cholesky factorization succeeds. The run artifacts record global and per-class ranks, constant dimensions, jitter, the training density range, and non-finite fractions. The fitted GDA state and per-example training density values are also saved.")
+
+    document.add_heading("4.5 Staged implementation workflow", level=2)
+    paragraph(document, "The implementation was validated in stages. A two-epoch pilot used 5,000 training, 1,000 validation, and 1,000 test images to check finite losses and gradients, checkpoint reloads, GDA fitting, metrics, and artifact output. The first full experiment then trained both models on seed 3024 and evaluated classification, calibration, prediction errors, SVHN OOD detection, and density diagnostics. After those checks passed, the same configuration was then used for seeds 3025 and 3026.")
+
+    document.add_heading("4.6 Validation testing and reproducibility", level=2)
+    paragraph(document, "The 16 automated tests cover four groups. Probability and loss tests check positive concentrations, normalized probabilities, and finite DAEDL losses and gradients. Metric tests check NLL, Brier score, ECE, entropy, and AUROC/AUPR direction. Density tests cover shapes, CPU float64 state, rank-deficient covariance handling, and finite scores. Reproducibility tests cover stratified disjoint splits, exposed model outputs, and spectral-normalization coverage.")
+    paragraph(document, "Every final run saved its configuration, environment, split indices, progress log, training history, best-validation and final checkpoints, per-example CIFAR-10 and SVHN predictions, metrics, runtime, and DAEDL density diagnostics where applicable. Aggregate tables were recomputed from the saved predictions. The six-run audit verified matched within-seed splits, checkpoint selection, probability normalization, finite outputs, positive DAEDL concentrations, score direction, density stability, and sample-SD aggregation.")
 
     document.add_heading("5 Experimental Setup", level=1)
-    paragraph(document, "CIFAR-10 provided 45,000 training images, 5,000 validation images, and the untouched official 10,000-image test set [4]. SVHN supplied 10,000 deterministically selected OOD test images [5]. Both models used the same backbone, spectral normalization, augmentation, optimizer, schedule, epoch budget, and checkpoint rule. Seeds 3024, 3025, and 3026 controlled the stratified split and training randomness. The replicate unit is a training seed and model run; results are mean ± sample SD across three seeds.")
-    add_caption(document, "Table 1", "Frozen experimental configuration.")
+    document.add_heading("5.1 Datasets and split", level=2)
+    paragraph(document, "CIFAR-10 contains ten natural-object classes with 50,000 official training images and 10,000 official test images [4]. The training portion was divided into a stratified 45,000-image training set and 5,000-image validation set. Validation NLL selected checkpoints, while the official test set remained outside model selection.")
+    paragraph(document, "SVHN supplied 10,000 deterministically selected test images for OOD evaluation [5]. CIFAR-10 contains natural objects; SVHN contains street-view house-number digits. Their visual domains and semantic classes differ, making SVHN a useful OOD dataset for this controlled comparison without implying that it is the only possible benchmark.")
+
+    document.add_heading("5.2 Fair comparison design", level=2)
+    paragraph(document, "Softmax and DAEDL shared the same backbone, spectral-normalization configuration, split, training augmentation, batch size, optimizer, epoch budget, learning-rate schedule, and checkpoint criterion within each seed. These controls reduce differences caused by the feature extractor or training resources. DAEDL necessarily differs in its evidential objective, post-training density model, and density-aware inference.")
+
+    document.add_heading("5.3 Training protocol", level=2)
+    paragraph(document, "Each run trained for 30 epochs with batch size 64, AdamW, an initial learning rate of 1e-3, weight decay 5e-4, and cosine decay to 1e-5. Both models selected the checkpoint with minimum validation NLL. This provides a common probability-based criterion even though their training objectives differ. The best-validation checkpoint and the final-epoch checkpoint were both saved, and the test set was never used for selection.")
+    add_caption(document, "Table 1", "Experimental configuration.")
     add_table(document, ["Setting", "Value"], [
         ["Models", "Softmax and DAEDL"],
         ["Backbone", "Spectrally normalized CIFAR ResNet-18, base width 32"],
@@ -517,12 +627,38 @@ def build_docx(aggregate: pd.DataFrame, density: pd.DataFrame, source_url: str |
         ["Devices", "MPS training; CPU evaluation and float64 GDA"],
         ["OOD protocol", "CIFAR-10 ID; SVHN OOD; normalized entropy; OOD positive"],
     ], [1.55, 5.0])
-    paragraph(document, "Classification uses accuracy and Macro F1. Calibration uses negative log-likelihood (NLL), 15-bin expected calibration error (ECE), and multiclass Brier score. Error detection and OOD detection use normalized predictive entropy with AUROC and average precision (AUPR). Lower values are preferable for NLL, ECE, and Brier; higher values are preferable for accuracy, F1, AUROC, and AUPR.")
+
+    document.add_heading("5.4 Three-seed replication", level=2)
+    paragraph(document, "Seeds 3024, 3025, and 3026 each defined a complete model run. The seed controlled the stratified train-validation split, Python and NumPy random states, PyTorch initialization and training randomness, and the data-loader generator. Softmax and DAEDL shared indices within each seed. Results are reported as mean ± sample SD across the three runs, not across individual images. Three seeds were used to check whether the comparison remained consistent under different data splits and training randomness.")
+
+    document.add_heading("5.5 Classification evaluation", level=2)
+    paragraph(document, "Accuracy is the fraction of correct CIFAR-10 predictions. Macro F1 averages class-level F1 scores with equal weight for each class. CIFAR-10 is balanced, but Macro F1 still checks whether performance is distributed across classes instead of relying only on total accuracy.")
+
+    document.add_heading("5.6 Calibration evaluation", level=2)
+    paragraph(document, "Negative log-likelihood uses the probability assigned to the true class and gives a large penalty to confident mistakes. ECE divides predictions into 15 equal-width confidence bins and computes the count-weighted difference between mean confidence and observed accuracy in each bin. The multiclass Brier score is the mean squared difference between the predicted probability vector and the one-hot target. Using all three metrics gives a broader view of probability quality than relying on a single calibration measure.")
+
+    document.add_heading("5.7 Prediction-error uncertainty", level=2)
+    paragraph(document, "This experiment asks whether uncertainty can identify predictions that are likely to be wrong. Correct and incorrect CIFAR-10 predictions are separated using the ground-truth labels. Normalized predictive entropy lies in [0,1]; larger values indicate a more diffuse class distribution. Prediction error is the positive class. AUROC measures ranking across thresholds, and AUPR summarizes precision-recall performance for the error class.")
+
+    document.add_heading("5.8 OOD evaluation", level=2)
+    paragraph(document, "The OOD experiment asks whether the models assign greater uncertainty to inputs outside the CIFAR-10 distribution. CIFAR-10 is labelled ID, SVHN is labelled OOD, and OOD is the positive class. Normalized predictive entropy is the common score for both models, which avoids comparing method-specific scales. DAEDL's secondary score, 1-s(x), is evaluated separately as density-derived uncertainty.")
+
+    document.add_heading("5.9 Numerical stability and device policy", level=2)
+    paragraph(document, "Training used MPS, while loaded-checkpoint evaluation and feature extraction used CPU for both models. DAEDL covariance and density calculations used CPU float64, adaptive diagonal jitter, and Cholesky checks. Evaluation also checked finite outputs, probability sums, positive concentrations, density bounds, and score orientation before aggregation.")
+
+    document.add_heading("5.10 Experiment questions", level=2)
+    add_caption(document, "Table 2", "Evaluation questions and reported metrics.")
+    add_table(document, ["Experiment", "Main question", "Metrics"], [
+        ["Classification", "How accurately does the model classify CIFAR-10?", "Accuracy; Macro F1"],
+        ["Calibration", "Do predicted probabilities match empirical correctness?", "NLL; ECE; Brier"],
+        ["Error uncertainty", "Can uncertainty identify incorrect predictions?", "Entropy; AUROC; AUPR"],
+        ["OOD uncertainty", "Can uncertainty distinguish CIFAR-10 from SVHN?", "Entropy; AUROC; AUPR"],
+    ], [1.35, 3.75, 1.45])
 
     document.add_page_break()
     document.add_heading("6 Results", level=1)
     document.add_heading("6.1 Classification and calibration", level=2)
-    add_caption(document, "Table 2", "Clean CIFAR-10 classification and calibration. Values are mean ± sample SD across three training seeds.")
+    add_caption(document, "Table 3", "Clean CIFAR-10 classification and calibration. Values are mean ± sample SD across three training seeds.")
     add_table(document, ["Metric", "Softmax", "DAEDL", "Preferred direction"], [
         ["Accuracy", value(aggregate, "softmax", "accuracy"), value(aggregate, "daedl", "accuracy"), "Higher"],
         ["Macro F1", value(aggregate, "softmax", "macro_f1"), value(aggregate, "daedl", "macro_f1"), "Higher"],
@@ -536,70 +672,70 @@ def build_docx(aggregate: pd.DataFrame, density: pd.DataFrame, source_url: str |
     add_figure(document, FIGURES / "figure2_three_seed_headline.png", 6.6)
 
     document.add_heading("6.2 Reliability", level=2)
-    paragraph(document, "The seed-3024 reliability diagram illustrates why a single calibration summary needs context. DAEDL tracks the ideal diagonal more closely in several high-confidence bins, consistent with its lower ECE. The plot is illustrative rather than aggregate: bins with fewer than 50 test examples are suppressed for readability, but ECE is still calculated from all 15 equal-width bins.")
+    paragraph(document, "The seed-3024 reliability diagram illustrates why a single calibration summary needs context. DAEDL tracks the ideal diagonal more closely in several high-confidence bins, consistent with its lower ECE. The plot shows seed 3024 as an example. Bins with fewer than 50 test examples are suppressed for readability, while ECE is calculated from all 15 equal-width bins.")
     add_caption(document, "Figure 3", "CIFAR-10 reliability at the predefined representative seed 3024.")
     add_figure(document, FIGURES / "figure3_reliability_seed3024.png", 4.7)
 
     document.add_heading("6.3 Prediction error uncertainty", level=2)
     paragraph(document, f"Both methods assigned substantially greater normalized entropy to incorrect predictions. Across seeds, Softmax's correct and incorrect mean entropies were {value(aggregate, 'softmax', 'error_correct_mean_entropy')} and {value(aggregate, 'softmax', 'error_incorrect_mean_entropy')}; DAEDL's were {value(aggregate, 'daedl', 'error_correct_mean_entropy')} and {value(aggregate, 'daedl', 'error_incorrect_mean_entropy')}. The distributions therefore contain useful information about mistakes for both methods.")
-    paragraph(document, "DAEDL's larger absolute entropy does not automatically mean better error detection. AUROC evaluates how well uncertainty ranks incorrect above correct predictions. Softmax had a small consistent AUROC advantage at every seed, while AUPR changed paired direction. The most defensible conclusion is that both methods detected errors well and Softmax ranked them slightly better under AUROC.")
+    paragraph(document, "DAEDL produced larger entropy values. AUROC instead measures how well uncertainty ranks incorrect predictions above correct ones. Both models separated incorrect from correct predictions well, with Softmax achieving a slightly higher AUROC in every seed. AUPR changed paired direction.")
 
-    document.add_heading("6.4 SVHN out of distribution uncertainty", level=2)
-    add_caption(document, "Table 3", "Error and SVHN OOD detection using normalized predictive entropy. Values are mean ± sample SD across three seeds.")
+    document.add_heading("6.4 SVHN Out-of-Distribution Uncertainty", level=2)
+    add_caption(document, "Table 4", "Error and SVHN OOD detection using normalized predictive entropy. Values are mean ± sample SD across three seeds.")
     add_table(document, ["Metric", "Softmax", "DAEDL"], [
         ["Error AUROC", value(aggregate, "softmax", "error_auroc"), value(aggregate, "daedl", "error_auroc")],
         ["Error AUPR", value(aggregate, "softmax", "error_aupr"), value(aggregate, "daedl", "error_aupr")],
         ["SVHN OOD AUROC", value(aggregate, "softmax", "ood_auroc"), value(aggregate, "daedl", "ood_auroc")],
         ["SVHN OOD AUPR", value(aggregate, "softmax", "ood_aupr"), value(aggregate, "daedl", "ood_aupr")],
     ], [2.5, 1.9, 1.9])
-    paragraph(document, f"DAEDL consistently assigned greater entropy to SVHN than to CIFAR-10: its ID and OOD mean entropies were {value(aggregate, 'daedl', 'ood_id_mean_entropy')} and {value(aggregate, 'daedl', 'ood_mean_entropy')}. Softmax showed the same direction at a lower absolute scale. However, method ranking was seed dependent. Softmax had higher OOD AUROC at seeds 3024 and 3026, while DAEDL was higher at seed 3025. The aggregate values therefore do not establish a stable OOD winner.")
-    paragraph(document, "DAEDL's secondary density-only uncertainty also lacked a consistent advantage over its entropy score. Density AUROC was 0.8641, 0.8420, and 0.8498 at seeds 3024–3026. It exceeded DAEDL entropy only at seed 3024. This negative result is retained because the evaluation protocol was frozen before the replications.")
+    paragraph(document, f"DAEDL consistently assigned greater entropy to SVHN than to CIFAR-10: its ID and OOD mean entropies were {value(aggregate, 'daedl', 'ood_id_mean_entropy')} and {value(aggregate, 'daedl', 'ood_mean_entropy')}. Softmax showed the same direction at a lower absolute scale. Softmax had higher OOD AUROC at seeds 3024 and 3026; DAEDL was higher at seed 3025. Neither method was consistently better across the three seeds.")
+    paragraph(document, "DAEDL's secondary density-only uncertainty had AUROC values of 0.8641, 0.8420, and 0.8498 at seeds 3024–3026. The density score exceeded DAEDL entropy only at seed 3024, so the improvement was not consistent across seeds.")
     add_caption(document, "Figure 4", "Normalized predictive-entropy distributions at seed 3024. Numeric conclusions use all three seeds.")
     add_figure(document, FIGURES / "figure4_entropy_distributions_seed3024.png", 6.35)
 
     document.add_heading("7 Discussion", level=1)
     document.add_heading("7.1 Accuracy and uncertainty", level=2)
-    paragraph(document, "DAEDL added a structured probabilistic representation without improving clean classification in this setup. This is not an implementation failure: every run completed, checkpoint validation passed, and the classification differences repeated across seeds. The result shows that a dedicated uncertainty mechanism does not guarantee a better classifier.")
-    document.add_heading("7.2 Calibration is multi dimensional", level=2)
-    paragraph(document, "DAEDL's ECE advantage and Softmax's NLL/Brier advantages coexist because the metrics measure different properties. Reporting only ECE would make DAEDL appear generally better calibrated, while reporting only NLL would hide its more favorable binned confidence-frequency agreement. The accurate statement is narrower: DAEDL improved ECE, while Softmax remained stronger under the two proper scoring rules.")
+    paragraph(document, "Softmax achieved higher clean classification accuracy in all three seeds. In this setup, DAEDL's uncertainty modelling did not improve classification performance.")
+    document.add_heading("7.2 Calibration is Multidimensional", level=2)
+    paragraph(document, "DAEDL consistently achieved lower ECE, whereas Softmax achieved lower NLL and Brier scores. These metrics can disagree because ECE measures binned confidence-frequency agreement, while NLL and Brier score evaluate the full probability distribution and penalize probability errors differently.")
     document.add_heading("7.3 Magnitude and usefulness", level=2)
-    paragraph(document, "DAEDL produced higher entropy for correct, incorrect, ID, and OOD samples. That wider numerical range made mistakes and SVHN inputs visibly uncertain, but it did not reliably improve discrimination AUROC. The practical question is whether a score ranks risky inputs consistently, not simply whether its numeric value is larger.")
+    paragraph(document, "DAEDL produced higher entropy for correct, incorrect, ID, and OOD samples. That wider numerical range made mistakes and SVHN inputs visibly uncertain. AUROC, however, depends on how consistently the score ranks risky inputs, and DAEDL did not improve that ranking consistently.")
     document.add_heading("7.4 Seed dependence", level=2)
-    paragraph(document, "Multiple seeds materially changed the OOD interpretation. Seed 3024 alone suggested a clear Softmax advantage; seed 3025 reversed the ranking. The three-seed aggregate favors Softmax numerically, but the change in direction prevents a stable superiority claim. No significance test was added because three runs support descriptive consistency, not a persuasive estimate of a sampling distribution.")
+    paragraph(document, "Multiple seeds changed the OOD interpretation. Seed 3024 favored Softmax, seed 3025 favored DAEDL, and seed 3026 favored Softmax. The three-seed mean favored Softmax, but the ordering was not consistent. With only three runs, the comparison is reported descriptively without a hypothesis test.")
     document.add_heading("7.5 Assignment scale adaptation", level=2)
-    paragraph(document, "The original DAEDL work used a different architecture and larger training setup [1]. This project used a compact ResNet-18, 128-dimensional embeddings, 30 epochs, and laptop hardware so that a matched three-seed comparison was feasible. It is an implementation and evaluation of the method's central ideas, not an exact reproduction of the paper's headline results.")
+    paragraph(document, "The original DAEDL work used a different architecture and larger training setup [1]. This project used a compact ResNet-18, 128-dimensional embeddings, 30 epochs, and laptop hardware so that a matched three-seed comparison was feasible. It evaluates the method's central ideas at assignment scale; the results are specific to this setup.")
 
     document.add_heading("8 Limitations", level=1)
-    paragraph(document, "The evaluation uses one in-distribution dataset, one OOD dataset, and three seeds. It does not cover every corruption, architecture, or evidential baseline. No exhaustive hyperparameter search was performed, and settings were frozen before replications to avoid tuning to seed 3024. MPS and CPU adaptations differ from the authors' CUDA-oriented environment. The DAEDL feature space was rank deficient even though covariance stabilization remained finite.")
-    paragraph(document, f"Global centered embedding rank was {int(density.iloc[0].global_embedding_rank)}, {int(density.iloc[1].global_embedding_rank)}, and {int(density.iloc[2].global_embedding_rank)} out of 128, while constant dimensions were {int(density.iloc[0].constant_dimensions)}, {int(density.iloc[1].constant_dimensions)}, and {int(density.iloc[2].constant_dimensions)}. Per-class covariance ranks spanned {int(density.class_rank_min.min())}–{int(density.class_rank_max.max())}. Jitter remained around 1e-8 to 1e-7 and every non-finite fraction was zero, so the density results are usable but the reduced-rank representation should remain visible as a limitation.")
-    paragraph(document, "No corruption experiment was added after the three-seed study. This was a deliberate stopping decision: the core assignment questions were already answered, and adding another analysis after reviewing outcomes would have expanded the scope without resolving the seed-sensitive OOD ranking.")
+    paragraph(document, "The evaluation uses one in-distribution dataset, one OOD dataset, and three seeds. No exhaustive hyperparameter search was performed, and the study did not cover other architectures or evidential baselines. MPS and CPU adaptations differ from the authors' CUDA-oriented environment. The DAEDL feature space was rank deficient even though covariance stabilization remained finite.")
+    paragraph(document, f"Global centered embedding rank was {int(density.iloc[0].global_embedding_rank)}, {int(density.iloc[1].global_embedding_rank)}, and {int(density.iloc[2].global_embedding_rank)} out of 128, while constant dimensions were {int(density.iloc[0].constant_dimensions)}, {int(density.iloc[1].constant_dimensions)}, and {int(density.iloc[2].constant_dimensions)}. Per-class covariance ranks spanned {int(density.class_rank_min.min())}–{int(density.class_rank_max.max())}. Jitter remained around 1e-8 to 1e-7 and every non-finite fraction was zero. Density fitting remained numerically stable, although the reduced embedding rank is a limitation of this implementation.")
+    paragraph(document, "Corruption experiments were outside the final scope of this assignment.")
 
     document.add_page_break()
     document.add_heading("9 What I Learned", level=1)
     paragraph(document, "Before this assignment, I tended to read a classifier's probability as a direct statement of confidence. The experiment showed me that uncertainty needs separate evidence. A model can be accurate and still assign probabilities that do not match how often it is correct.")
     paragraph(document, "I learned that calibration is not a single number. DAEDL had lower ECE in every seed, which initially looks like a clear calibration advantage. NLL and Brier score gave the opposite ranking. This result helped me understand that ECE depends on confidence bins, while proper scoring rules evaluate the full probability distribution and penalize confident errors differently. I should therefore explain which calibration property a metric measures instead of using ‘better calibrated’ without qualification.")
-    paragraph(document, "I also expected a method designed for uncertainty to outperform Softmax clearly on OOD detection. The seed results showed that this expectation was too simple. Softmax was better at seed 3024, DAEDL was better at seed 3025, and Softmax was better again at seed 3026. Had I stopped after the first run, I would have described the OOD comparison too confidently. Repeating the experiment did not merely make the result look more reliable; it changed the conclusion I was allowed to make.")
-    paragraph(document, "The project also taught me that a larger uncertainty value is not automatically more useful. DAEDL produced much greater entropy on incorrect and SVHN inputs, but Softmax had slightly better error AUROC and a higher mean OOD AUROC. The separation between groups matters more than the absolute scale. This distinction is especially important when comparing models whose uncertainty scores arise from different parameterizations.")
-    paragraph(document, "Using Codex did not remove the need for validation. Codex wrote the code and ran the experiments, but the workflow still needed tests for formulas and metrics, matched baselines, fixed checkpoint rules, checks for OOD score direction, probability normalization, and independent recomputation from saved predictions. The most useful AI behavior was not rapid code generation alone. It was the ability to inspect failures, record what changed, and preserve negative or mixed results rather than tuning them away.")
-    paragraph(document, "Finally, I learned how theory meets hardware and numerical constraints. MPS could train the networks but not run float64 covariance calculations, and reloaded spectral-normalized checkpoints required CPU evaluation in this environment. Rank-deficient embedding covariances required adaptive diagonal loading and diagnostics. Reproducibility and numerical checks were therefore part of the experiment, not optional software details.")
+    paragraph(document, "I also expected a method designed for uncertainty to outperform Softmax clearly on OOD detection. The result at seed 3024 initially pointed in the other direction. After running the other two seeds, my interpretation changed: DAEDL was better at seed 3025, while Softmax was better again at seed 3026. The full result was mixed across seeds.")
+    paragraph(document, "The project also taught me to separate uncertainty magnitude from ranking quality. DAEDL produced much greater entropy on incorrect and SVHN inputs. Softmax still had slightly better error AUROC and a higher mean OOD AUROC. The separation between groups matters more than the absolute scale when models use different uncertainty parameterizations.")
+    paragraph(document, "Codex wrote the code and ran the experiments. I found it especially useful for debugging and checking the experiment, not only for generating code. The workflow still needed tests for formulas and metrics, matched baselines, fixed checkpoint rules, checks for OOD score direction, probability normalization, and independent recomputation from saved predictions. It also helped me inspect failures, record changes, and keep mixed results in the final analysis.")
+    paragraph(document, "Finally, I learned how theory meets hardware and numerical constraints. MPS could train the networks but could not run float64 covariance calculations, and reloaded spectral-normalized checkpoints required CPU evaluation in this environment. Rank-deficient embedding covariances required adaptive diagonal loading and diagnostics. These hardware and numerical checks became part of the experimental workflow.")
 
     document.add_heading("10 Conclusion", level=1)
-    paragraph(document, "Codex successfully implemented DAEDL and compared it with a matched Softmax baseline across three CIFAR-10 seeds. DAEDL consistently reduced ECE, while Softmax remained stronger in accuracy, Macro F1, NLL, Brier score, and error-detection AUROC. Both methods assigned greater uncertainty to mistakes, and DAEDL assigned greater entropy to SVHN than CIFAR-10, but the OOD method ranking was not stable. The exercise demonstrated both the potential and limits of probabilistic uncertainty methods and showed why AI-generated implementation still requires careful experimental validation.")
+    paragraph(document, "Codex implemented DAEDL and compared it with a matched Softmax baseline across three CIFAR-10 seeds. DAEDL consistently reduced ECE. Softmax achieved better accuracy, Macro F1, NLL, Brier score, and error-detection AUROC. Both methods assigned greater uncertainty to mistakes, and DAEDL assigned greater entropy to SVHN than CIFAR-10. The OOD ranking changed across seeds, and the added probabilistic structure did not improve every predictive or uncertainty measure.")
 
     if source_url:
         document.add_heading("11 Source Code", level=1)
+        paragraph(document, "The complete source code, experiment scripts, configurations, and reproducibility files for this assignment are available at:")
         p = document.add_paragraph()
-        p.add_run("Source code: ").bold = True
         add_hyperlink(p, source_url, source_url)
 
     document.add_page_break()
-    document.add_heading("References", level=1)
+    document.add_heading("12 References" if source_url else "References", level=1)
     references = [
         ("[1] Yoon, T., and Kim, H. (2024). “Uncertainty Estimation by Density Aware Evidential Deep Learning.” Proceedings of the 41st International Conference on Machine Learning, PMLR 235, 57217–57243. ", "https://proceedings.mlr.press/v235/yoon24a.html"),
         ("[2] Sensoy, M., Kaplan, L., and Kandemir, M. (2018). “Evidential Deep Learning to Quantify Classification Uncertainty.” Advances in Neural Information Processing Systems 31. ", "https://papers.nips.cc/paper/2018/hash/a981f2b708044d6fb4a71a1463242520-Abstract.html"),
         ("[3] Guo, C., Pleiss, G., Sun, Y., and Weinberger, K. Q. (2017). “On Calibration of Modern Neural Networks.” Proceedings of the 34th International Conference on Machine Learning, PMLR 70, 1321–1330. ", "https://proceedings.mlr.press/v70/guo17a.html"),
         ("[4] Krizhevsky, A. (2009). Learning Multiple Layers of Features from Tiny Images. Technical report, University of Toronto. ", "https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf"),
-        ("[5] Netzer, Y., Wang, T., Coates, A., Bissacco, A., Wu, B., and Ng, A. Y. (2011). “Reading Digits in Natural Images with Unsupervised Feature Learning.” NIPS Workshop on Deep Learning and Unsupervised Feature Learning. ", "https://ufldl.stanford.edu/housenumbers/nips2011_housenumbers.pdf"),
+        ("[5] Netzer, Y., Wang, T., Coates, A., Bissacco, A., Wu, B., and Ng, A. Y. (2011). “Reading Digits in Natural Images with Unsupervised Feature Learning.” NIPS Workshop on Deep Learning and Unsupervised Feature Learning. ", "https://cs.stanford.edu/~twangcat/papers/nips2011_housenumbers.pdf"),
         ("[6] PyTorch Contributors. “MPS backend.” PyTorch documentation. ", "https://docs.pytorch.org/docs/main/notes/mps.html"),
         ("[7] Yoon, T., and Kim, H. “DAEDL official implementation.” GitHub. ", "https://github.com/TaeseongYoon/DAEDL"),
     ]
@@ -609,9 +745,9 @@ def build_docx(aggregate: pd.DataFrame, density: pd.DataFrame, source_url: str |
         add_hyperlink(p, url, url)
 
     properties = document.core_properties
-    properties.title = "AI Assisted Implementation and Evaluation of Density Aware Evidential Deep Learning"
+    properties.title = "Density-Aware Evidential Deep Learning for CIFAR-10 Classification and Uncertainty Estimation"
     properties.subject = "CISC3024 Pattern Recognition AI Assignment #2"
-    properties.author = "Prepared with Codex"
+    properties.author = "Ziqi Huang"
     properties.keywords = "DAEDL, CIFAR-10, uncertainty, calibration, evidential deep learning"
     output.parent.mkdir(parents=True, exist_ok=True)
     document.save(output)
